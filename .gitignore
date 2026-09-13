@@ -1,0 +1,28 @@
+# Local credentials and environment files
+.env
+.env.*
+!.env.example
+
+# Python environments and generated files
+.venv/
+portable-runtime/
+**/__pycache__/
+*.py[cod]
+
+# JavaScript dependencies and generated builds
+frontend/node_modules/
+frontend/dist/
+services/**/node_modules/
+
+# Local application data
+*.db
+backend/uploads/*
+backend/media/*
+!backend/uploads/.gitkeep
+!backend/media/.gitkeep
+
+# Local editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

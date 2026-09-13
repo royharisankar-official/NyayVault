@@ -1,0 +1,17 @@
+services:
+  dms:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      SECRET_KEY: ${SECRET_KEY:-replace-this-in-production}
+      DATABASE_URL: sqlite:////app/data/dms.db
+    volumes:
+      - dms_data:/app/data
+      - dms_uploads:/app/backend/uploads
+      - dms_media:/app/backend/media
+
+volumes:
+  dms_data:
+  dms_uploads:
+  dms_media:

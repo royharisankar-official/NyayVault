@@ -1,0 +1,6 @@
+# OCR (requires the Tesseract executable in PATH)
+pytesseract>=0.3.13
+Pillow>=10.0
+
+# Local embeddings and semantic/RAG retrieval
+sentence-transformers>=3.0

@@ -1,0 +1,12 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+sqlalchemy>=2.0
+python-multipart>=0.0.9
+pydantic>=2.0
+cryptography>=43.0
+bcrypt>=4.2
+
+# Optional capabilities:
+# pytesseract>=0.3.13, Pillow>=10.0, pypdf>=5.0 and PyMuPDF>=1.24
+# (also install Tesseract OCR on the host for scanned-image/PDF OCR)
+# sentence-transformers>=3.0 (downloads an embedding model on first semantic search)

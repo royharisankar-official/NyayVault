@@ -16,6 +16,10 @@ so it does not rely on the drive letter or the developer's machine paths.
    assistance, and **Audit & Integrity** to review the audit trail.
 5. Use the **Verify chain** button to check the available audit history.
 
+If you forget your password, choose **Forgot password?** on the sign-in screen.
+This prototype generates a one-time reset token in the same browser because no
+email provider is configured; complete the reset within 15 minutes.
+
 API health check: [https://nyayvault.onrender.com/health](https://nyayvault.onrender.com/health)  
 Interactive API documentation: [https://nyayvault.onrender.com/docs](https://nyayvault.onrender.com/docs)
 

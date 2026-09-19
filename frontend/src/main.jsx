@@ -1349,9 +1349,57 @@ function LoadingScreen() {
 
 function Auth({onDone,notify}) {
   const [register,setRegister] = useState(true);
+  const [forgot,setForgot] = useState(false);
+  const [resetToken,setResetToken] = useState("");
   const [loading,setLoading] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState("");
   const [authError, setAuthError] = useState("");
+  const submitResetRequest = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+    setAuthError("");
+    const values = Object.fromEntries(new FormData(event.currentTarget));
+    const email = String(values.email || "").trim().toLowerCase();
+    try {
+      const result = await request("/auth/password-reset/request", {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({email}),
+      });
+      if (result.reset_token) {
+        setResetToken(result.reset_token);
+        setRegisteredEmail(email);
+        notify("Reset token generated. It expires in 15 minutes.");
+      } else {
+        notify(result.message);
+      }
+    } catch (error) {
+      setAuthError(error.message);
+    } finally { setLoading(false); }
+  };
+  const submitReset = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+    setAuthError("");
+    const values = Object.fromEntries(new FormData(event.currentTarget));
+    if (values.password !== values.confirm_password) {
+      setAuthError("Passwords do not match");
+      setLoading(false);
+      return;
+    }
+    try {
+      await request("/auth/password-reset/confirm", {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({token: resetToken, password: String(values.password || "")}),
+      });
+      setForgot(false);
+      setRegister(false);
+      setResetToken("");
+      setRegisteredEmail(String(values.email || registeredEmail));
+      notify("Password updated. Please sign in.");
+    } catch (error) {
+      setAuthError(error.message);
+    } finally { setLoading(false); }
+  };
   const submit = async (event) => {
     event.preventDefault();
     setLoading(true);
@@ -1394,10 +1442,20 @@ function Auth({onDone,notify}) {
       </section>
       <section className="auth-card">
         <div className="auth-card-top"><div className="auth-card-icon"><KeyRound size={19}/></div><div><div className="font-bold">Secure access</div><div className="text-xs text-slate-500">{PRODUCT_NAME} workspace</div></div><div className="auth-lock"><FileLock2 size={15}/></div></div>
-        <div className="auth-card-kicker">{register ? "NEW WORKSPACE IDENTITY" : "AUTHORIZED PERSONNEL ONLY"}</div>
-        <h2>{register ? "Create your account" : "Welcome back"}</h2>
-        <p className="auth-card-copy">{register ? "Set up an authorized workspace identity." : "Sign in to continue to your protected evidence workspace."}</p>
-        <form key={register ? "register" : "login"} onSubmit={submit} className="auth-form">
+        <div className="auth-card-kicker">{forgot ? "ACCOUNT RECOVERY" : register ? "NEW WORKSPACE IDENTITY" : "AUTHORIZED PERSONNEL ONLY"}</div>
+        <h2>{forgot ? (resetToken ? "Set a new password" : "Forgot your password?") : register ? "Create your account" : "Welcome back"}</h2>
+        <p className="auth-card-copy">{forgot ? (resetToken ? "Choose a new password for your workspace account." : "Enter your work email to generate a one-time reset token.") : register ? "Set up an authorized workspace identity." : "Sign in to continue to your protected evidence workspace."}</p>
+        {forgot && !resetToken && <form key="forgot-request" onSubmit={submitResetRequest} className="auth-form">
+          <label>Work email<input name="email" required type="email" autoComplete="email" placeholder="name@organization.gov" /></label>
+          <button type="submit" disabled={loading}>{loading ? "Generating…" : "Generate reset token"} <ArrowUpRight size={15}/></button>
+        </form>}
+        {forgot && resetToken && <form key="forgot-confirm" onSubmit={submitReset} className="auth-form">
+          <div className="rounded-xl border border-mint/20 bg-mint/5 p-3 text-[11px] leading-5 text-mint">One-time reset token generated for this demo. Keep it private and complete the reset before it expires.</div>
+          <label>New password<input name="password" required minLength="8" type="password" autoComplete="new-password" placeholder="Minimum 8 characters" /></label>
+          <label>Confirm password<input name="confirm_password" required minLength="8" type="password" autoComplete="new-password" placeholder="Repeat your new password" /></label>
+          <button type="submit" disabled={loading}>{loading ? "Updating…" : "Update password"} <ArrowUpRight size={15}/></button>
+        </form>}
+        {!forgot && <form key={register ? "register" : "login"} onSubmit={submit} className="auth-form">
           {register && <label>Full name<input name="full_name" required placeholder="Your name" /></label>}
           {register && <label>Role<select name="role" defaultValue="investigator"><option value="admin">Government administrator</option><option value="police">Police officer</option><option value="investigator">Investigator</option><option value="forensic_officer">Forensic officer</option><option value="prosecutor">Prosecutor</option><option value="judicial_user">Judicial user</option><option value="court_officer">Court officer</option></select></label>}
           {register && <label>Department<select name="department" defaultValue="investigations"><option value="investigations">Investigations</option><option value="police">Police</option><option value="forensics">Forensics</option><option value="prosecution">Prosecution</option><option value="court">Court</option><option value="administration">Administration</option><option value="public">Public assistance</option></select></label>}
@@ -1405,9 +1463,10 @@ function Auth({onDone,notify}) {
           <label>Password<input name="password" required minLength="8" type="password" autoComplete={register ? "new-password" : "current-password"} placeholder="Minimum 8 characters" /></label>
           <button type="submit" disabled={loading}>{loading ? "Authenticating…" : <>{register ? "Create account" : "Enter secure workspace"} <ArrowUpRight size={15}/></>}</button>
         </form>
+        }
         {authError && <div role="alert" className="mt-3 rounded-xl border border-red-300/20 bg-red-400/10 px-3 py-2 text-xs text-red-200">{authError}</div>}
         <div className="auth-note"><ShieldCheck size={14}/> Your session is protected with role-based access control.</div>
-        <button type="button" onClick={() => { setRegister(!register); setAuthError(""); }} className="auth-switch">{register ? "I already have an account" : "Create a new account"} <ChevronRight size={13}/></button>
+        {forgot ? <button type="button" onClick={() => { setForgot(false); setResetToken(""); setAuthError(""); }} className="auth-switch">Back to sign in <ChevronRight size={13}/></button> : <>{!register && <button type="button" onClick={() => { setForgot(true); setAuthError(""); }} className="auth-switch">Forgot password? <ChevronRight size={13}/></button>}<button type="button" onClick={() => { setRegister(!register); setAuthError(""); }} className="auth-switch">{register ? "I already have an account" : "Create a new account"} <ChevronRight size={13}/></button></>}
       </section>
     </div>
   </div>;

@@ -29,7 +29,7 @@ from app.capabilities import (
 from app.models import (
     AIQuery, AuditLog, BackupRecord, BlockchainRecord, Case, CaseCollaborator,
     CaseEvent, ChainAnchor, Document, DocumentShare, DocumentVersion,
-    Notification, Permission, User,
+    Notification, PasswordResetToken, Permission, User,
 )
 from app.public_portal import (
     PublicCaseStatus, PublicSessionLocal, public_session,
@@ -196,6 +196,15 @@ class LoginRequest(BaseModel):
     email: str
     password: str
     mfa_code: str | None = None
+
+
+class PasswordResetRequest(BaseModel):
+    email: str
+
+
+class PasswordResetConfirmRequest(BaseModel):
+    token: str = Field(min_length=32)
+    password: str = Field(min_length=8)
 
 
 class CaseRequest(BaseModel):
@@ -680,6 +689,53 @@ def login(request: LoginRequest, db: Session = Depends(get_db)):
     db.commit()
     return {"access_token": token, "token_type": "bearer",
             "user": {"id": user.id, "email": user.email, "full_name": user.full_name, "role": user.role}}
+
+
+@app.post("/api/auth/password-reset/request")
+def request_password_reset(request: PasswordResetRequest, db: Session = Depends(get_db)):
+    email = request.email.strip().lower()
+    user = db.query(User).filter(User.email == email, User.is_active.is_(True)).first()
+    response = {
+        "message": "If an active account exists, a reset token has been generated.",
+        "reset_token": None,
+        "expires_in_minutes": 15,
+    }
+    if user:
+        raw_token = secrets.token_urlsafe(32)
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        db.query(PasswordResetToken).filter(
+            PasswordResetToken.user_id == user.id,
+            PasswordResetToken.used_at.is_(None),
+        ).update({"used_at": datetime.utcnow()})
+        db.add(PasswordResetToken(
+            user_id=user.id,
+            token_hash=token_hash,
+            expires_at=datetime.utcnow() + timedelta(minutes=15),
+        ))
+        write_audit(db, "user.password_reset_requested", "user", user.id, None)
+        db.commit()
+        response["reset_token"] = raw_token
+    return response
+
+
+@app.post("/api/auth/password-reset/confirm")
+def confirm_password_reset(request: PasswordResetConfirmRequest, db: Session = Depends(get_db)):
+    token_hash = hashlib.sha256(request.token.encode()).hexdigest()
+    reset = db.query(PasswordResetToken).filter(
+        PasswordResetToken.token_hash == token_hash,
+        PasswordResetToken.used_at.is_(None),
+        PasswordResetToken.expires_at > datetime.utcnow(),
+    ).first()
+    if not reset:
+        raise HTTPException(status_code=400, detail="This reset token is invalid or expired")
+    user = db.query(User).filter(User.id == reset.user_id, User.is_active.is_(True)).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="This reset token is invalid or expired")
+    user.hashed_password = get_password_hash(request.password)
+    reset.used_at = datetime.utcnow()
+    write_audit(db, "user.password_reset_completed", "user", user.id, None)
+    db.commit()
+    return {"message": "Password updated. You can now sign in with your new password."}
 
 
 @app.post("/api/auth/logout")

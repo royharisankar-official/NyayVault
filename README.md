@@ -61,5 +61,17 @@ docker compose up --build
 Then browse to `http://127.0.0.1:8000`. Stop it with `Ctrl+C`, or run
 `docker compose down` later.
 
+## Deploy on Render
+
+This repository includes a `render.yaml` Blueprint and a production Dockerfile.
+In Render, choose **New > Blueprint**, connect the GitHub repository, and apply
+the Blueprint. The image builds the Vite frontend inside Docker, so a local
+`frontend\dist` folder is not required in Git. The service listens on Render's
+`PORT` environment variable and uses `/health` for health checks.
+
+The default SQLite database and uploaded files use the container filesystem.
+They are suitable for a demo, but Render's filesystem is ephemeral; configure a
+persistent disk or an external database/object store before production use.
+
 This is a demonstration prototype. Replace default secrets and review data
 protection before using it with real confidential documents.

@@ -10,11 +10,13 @@ import hmac
 import io
 import json
 import os
+import re
 import secrets
 import shutil
 import struct
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -153,27 +155,137 @@ def semantic_search(query: str, documents: list[dict]) -> list[dict]:
 
 def gemini_summary(text: str) -> str:
     if not settings.GEMINI_API_KEY:
-        raise RuntimeError("GEMINI_API_KEY is not configured")
+        return local_document_summary(text)
+    document_text = text[:30000].strip()
+    if not document_text:
+        return "No readable text was extracted from this document. Open the original file and use OCR or a text-readable version before requesting a Gemini Summary."
     payload = json.dumps({
         "contents": [{"parts": [{"text": (
-            "Summarize this legal or investigation document in 3 concise sentences. "
-            "Do not invent facts. Document:\n" + text[:12000]
+            "Create a detailed internal document report from the source text below. "
+            "Use only facts explicitly present in the document; never invent or infer missing facts. "
+            "Preserve names, organisations, dates, reference numbers, amounts, locations, allegations, "
+            "actions, deadlines, evidence mentioned, and the document's stated status. "
+            "Clearly distinguish documented facts from uncertainty. Return these headings: "
+            "Executive summary, Document purpose, People and organisations, Key facts and events, "
+            "Important dates and deadlines, Reference numbers and amounts, Evidence or attachments mentioned, "
+            "Risks or inconsistencies, Recommended follow-up, and Missing or unclear information. "
+            "If a section is not present in the source, write 'Not stated in the document'. "
+            "This is a source-grounded summary, not legal advice.\n\nDocument:\n" + document_text
         )}]}]
     }).encode()
     request = urllib.request.Request(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?"
+        + urllib.parse.urlencode({"key": settings.GEMINI_API_KEY}),
         data=payload,
-        headers={"Content-Type": "application/json", "x-goog-api-key": settings.GEMINI_API_KEY},
+        headers={"Content-Type": "application/json"},
         method="POST",
     )
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
+        with urllib.request.urlopen(request, timeout=60) as response:
             result = json.loads(response.read().decode())
-    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as error:
+    except urllib.error.HTTPError as error:
+        detail = error.read().decode("utf-8", errors="replace")[:500]
+        raise RuntimeError(f"Gemini request failed ({error.code}): {detail}") from error
+    except (urllib.error.URLError, TimeoutError) as error:
         raise RuntimeError(f"Gemini request failed: {error}") from error
+    try:
         return result["candidates"][0]["content"]["parts"][0]["text"].strip()
     except (KeyError, IndexError, TypeError) as error:
         raise RuntimeError("Gemini returned an unexpected response") from error
+
+
+def local_document_summary(text: str) -> str:
+    """Create a grounded summary without an external model or API key."""
+    normalized = re.sub(r"\s+", " ", text or "").strip()
+    if not normalized:
+        return "The document has no readable text available for summarization."
+    sentences = re.split(r"(?<=[.!?])\s+", normalized)
+    selected = [sentence.strip() for sentence in sentences if sentence.strip()][:3]
+    if len(selected) == 1 and len(selected[0]) > 420:
+        selected[0] = selected[0][:417].rsplit(" ", 1)[0] + "..."
+    return " ".join(selected)
+
+
+def local_document_analysis(text: str) -> dict:
+    """Extract a useful, source-grounded intelligence report without an API."""
+    normalized = re.sub(r"\s+", " ", text or "").strip()
+    if not normalized:
+        return {
+            "summary": "The document has no readable text available for analysis.",
+            "key_points": [],
+            "entities": {"dates": [], "emails": [], "phone_numbers": [], "reference_numbers": []},
+            "risk_flags": ["Readable text is unavailable; important facts may be missing."],
+            "recommended_actions": ["Run OCR or upload a text-readable copy.", "Review the original document manually."],
+            "open_questions": ["What facts, dates, parties or obligations are contained in the original?"],
+            "confidence": "low",
+            "limitations": ["Analysis was limited because no extractable text was available."],
+        }
+
+    sentences = [part.strip() for part in re.split(r"(?<=[.!?])\s+", normalized) if part.strip()]
+    sentence_scores = []
+    signal_terms = (
+        "must", "shall", "deadline", "due", "notice", "complaint", "incident",
+        "payment", "evidence", "agreement", "order", "court", "date", "required",
+        "violation", "risk", "response", "submit", "expires",
+    )
+    for index, sentence in enumerate(sentences):
+        score = sum(1 for term in signal_terms if term in sentence.lower())
+        sentence_scores.append((score, -index, sentence))
+    key_points = [item[2] for item in sorted(sentence_scores, reverse=True)[:5]]
+    dates = sorted(set(re.findall(
+        r"\b(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{1,2}\s+"
+        r"(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|"
+        r"Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|"
+        r"Dec(?:ember)?)[,]?\s+\d{2,4})\b", normalized, re.IGNORECASE)))
+    emails = sorted(set(re.findall(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", normalized, re.IGNORECASE)))
+    phone_candidates = re.findall(r"(?<![\w])(?:\+?\d[\d\s().-]{8,}\d)(?![\w])", normalized)
+    phones = sorted(set(item.strip() for item in phone_candidates
+                        if len(re.sub(r"\D", "", item)) >= 10))
+    references = sorted(set(re.findall(
+        r"\b(?:FIR|CASE|CNR|REF|NO\.?|S\.?C\.?|WP)\s*[-:#/]?\s*[A-Z0-9/-]{3,}\b",
+        normalized, re.IGNORECASE)))
+    risk_flags = []
+    lowered = normalized.lower()
+    if any(term in lowered for term in ("urgent", "immediately", "within 24 hours", "deadline", "expires")):
+        risk_flags.append("The text indicates a possible deadline or urgency; verify the exact date and time.")
+    if any(term in lowered for term in ("missing", "not provided", "unavailable", "incomplete", "unsigned")):
+        risk_flags.append("The document may contain missing, incomplete or unsigned information.")
+    if any(term in lowered for term in ("confidential", "sensitive", "personal data", "identity")):
+        risk_flags.append("Sensitive or personal information may require restricted handling.")
+    if not risk_flags:
+        risk_flags.append("No obvious urgency or completeness risk was detected by the local checks.")
+    actions = [
+        "Verify names, reference numbers and dates against the original source.",
+        "Preserve the original file and record its hash and source.",
+    ]
+    if dates:
+        actions.append("Confirm whether any extracted date is a filing, response or expiry deadline.")
+    if references:
+        actions.append("Cross-check the extracted reference number with the issuing authority or case record.")
+    open_questions = []
+    if not dates:
+        open_questions.append("What are the relevant event, filing and response dates?")
+    if not references:
+        open_questions.append("What official case, filing or reference number identifies this document?")
+    open_questions.append("Which facts still require confirmation from an authorised person or official source?")
+    return {
+        "summary": local_document_summary(normalized),
+        "key_points": key_points,
+        "entities": {
+            "dates": dates,
+            "emails": emails,
+            "phone_numbers": phones,
+            "reference_numbers": references,
+        },
+        "risk_flags": risk_flags,
+        "recommended_actions": actions,
+        "open_questions": open_questions,
+        "confidence": "high" if len(normalized) >= 300 and len(sentences) >= 3 else "medium",
+        "limitations": [
+            "This is source-grounded extraction, not legal advice.",
+            "The local analyser does not determine truth, authenticity, liability or legal outcome.",
+        ],
+    }
 
 
 def gemini_generate(prompt: str) -> str:
@@ -184,15 +296,19 @@ def gemini_generate(prompt: str) -> str:
         "contents": [{"parts": [{"text": prompt[:30000]}]}]
     }).encode()
     request = urllib.request.Request(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?"
+        + urllib.parse.urlencode({"key": settings.GEMINI_API_KEY}),
         data=payload,
-        headers={"Content-Type": "application/json", "x-goog-api-key": settings.GEMINI_API_KEY},
+        headers={"Content-Type": "application/json"},
         method="POST",
     )
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
+        with urllib.request.urlopen(request, timeout=60) as response:
             result = json.loads(response.read().decode())
-    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as error:
+    except urllib.error.HTTPError as error:
+        detail = error.read().decode("utf-8", errors="replace")[:500]
+        raise RuntimeError(f"Gemini request failed ({error.code}): {detail}") from error
+    except (urllib.error.URLError, TimeoutError) as error:
         raise RuntimeError(f"Gemini request failed: {error}") from error
     try:
         return result["candidates"][0]["content"]["parts"][0]["text"].strip()

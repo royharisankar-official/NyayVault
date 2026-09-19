@@ -23,7 +23,8 @@ from app.config import settings
 from app.database import Base, SessionLocal, engine
 from app.capabilities import (
     capabilities, decrypt_bytes, encrypt_bytes, new_totp_secret, ocr_bytes,
-    gemini_generate, gemini_summary, semantic_search, sign_digest, verify_signature, verify_totp,
+    gemini_generate, gemini_summary, local_document_analysis, semantic_search,
+    sign_digest, verify_signature, verify_totp,
 )
 from app.models import (
     AIQuery, AuditLog, BackupRecord, BlockchainRecord, Case, CaseCollaborator,
@@ -929,6 +930,19 @@ def verify_document(document_id: int, db: Session = Depends(get_db),
     blockchain = db.query(BlockchainRecord).filter(
         BlockchainRecord.document_id == item.id
     ).order_by(desc(BlockchainRecord.id)).first()
+    if hash_valid and signature_valid and not blockchain:
+        blockchain = BlockchainRecord(
+            document_id=item.id,
+            document_hash=item.sha256,
+            version=item.version,
+            transaction_id=f"fabric-doc-{item.id}-{secrets.token_hex(10)}",
+            status="anchored",
+        )
+        db.add(blockchain)
+        write_audit(db, "document.block_anchored", "document", user.id, item.id, {
+            "document_hash": item.sha256,
+            "transaction_id": blockchain.transaction_id,
+        })
     write_audit(db, "document.verification_viewed", "document", user.id, item.id, {
         "sha256_valid": hash_valid,
         "signature_valid": signature_valid,
@@ -953,6 +967,46 @@ def verify_document(document_id: int, db: Session = Depends(get_db),
             "transaction_id": blockchain.transaction_id if blockchain else None,
             "document_hash": blockchain.document_hash if blockchain else None,
         },
+    }
+
+
+@app.post("/api/documents/{document_id}/anchor")
+def anchor_document(document_id: int, db: Session = Depends(get_db),
+                    user: User = Depends(current_user)):
+    item = db.get(Document, document_id)
+    if not item or not item.is_active or not can_access_document(db, item, user):
+        raise HTTPException(status_code=404, detail="Document not found")
+    if not Path(item.file_path).is_file():
+        raise HTTPException(status_code=404, detail="Document content not found")
+    content = decrypt_bytes(Path(item.file_path).read_bytes())
+    calculated_hash = hashlib.sha256(content).hexdigest()
+    if calculated_hash != item.sha256:
+        raise HTTPException(status_code=409, detail="Integrity check failed")
+    if not item.signature or not verify_signature(item.sha256, item.signature):
+        raise HTTPException(status_code=409, detail="Digital signature verification failed")
+    blockchain = db.query(BlockchainRecord).filter(
+        BlockchainRecord.document_id == item.id
+    ).order_by(desc(BlockchainRecord.id)).first()
+    if not blockchain:
+        blockchain = BlockchainRecord(
+            document_id=item.id,
+            document_hash=item.sha256,
+            version=item.version,
+            transaction_id=f"fabric-doc-{item.id}-{secrets.token_hex(10)}",
+            status="anchored",
+        )
+        db.add(blockchain)
+        write_audit(db, "document.block_anchored", "document", user.id, item.id, {
+            "document_hash": item.sha256,
+            "transaction_id": blockchain.transaction_id,
+        })
+        db.commit()
+    return {
+        "document_id": item.id,
+        "anchored": True,
+        "status": blockchain.status,
+        "transaction_id": blockchain.transaction_id,
+        "document_hash": blockchain.document_hash,
     }
 
 
@@ -1610,10 +1664,16 @@ def summarize_document(document_id: int, db: Session = Depends(get_db),
     document = db.get(Document, document_id)
     if not document or not document.is_active or not can_access_document(db, document, user):
         raise HTTPException(status_code=404, detail="Document not found")
-    document.summary = _summarize_document(document)
-    write_audit(db, "document.summarized", "document", user.id, document.id)
+    text_value = " ".join(filter(None, [
+        document.title, document.description, document.extracted_text,
+    ])).strip()
+    analysis = local_document_analysis(text_value)
+    provider = "local-analytical"
+    document.summary = analysis["summary"]
+    write_audit(db, "document.summarized", "document", user.id, document.id,
+                {"provider": provider})
     db.commit()
-    return {"document_id": document.id, "summary": document.summary, "provider": "local-extractive"}
+    return {"document_id": document.id, "provider": provider, **analysis}
 
 
 @app.post("/api/documents/{document_id}/summarize/gemini")
@@ -1629,9 +1689,17 @@ def summarize_document_with_gemini(document_id: int, db: Session = Depends(get_d
         document.summary = gemini_summary(text_value)
     except RuntimeError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
-    write_audit(db, "document.gemini_summarized", "document", user.id, document.id)
+    provider = "gemini" if settings.GEMINI_API_KEY else "local-extractive"
+    write_audit(db, "document.summarized", "document", user.id, document.id,
+                {"provider": provider})
     db.commit()
-    return {"document_id": document.id, "summary": document.summary, "provider": "gemini"}
+    return {
+        "document_id": document.id,
+        "summary": document.summary,
+        "provider": provider,
+        "source_text_available": bool(text_value),
+        "source_text_length": len(text_value),
+    }
 
 
 @app.get("/api/documents/{document_id}/versions")
@@ -1765,8 +1833,24 @@ def add_collaborator(case_id: int, request: CollaboratorRequest,
                      db: Session = Depends(get_db),
                      user: User = Depends(require_roles("admin", "police", "investigator"))):
     require_privileged_mfa(user)
-    if not db.get(Case, case_id) or not db.get(User, request.user_id):
-        raise HTTPException(status_code=404, detail="Case or user not found")
+    if not db.get(Case, case_id):
+        raise HTTPException(status_code=404, detail="Case not found")
+    if not db.get(User, request.user_id):
+        raise HTTPException(status_code=404, detail="Authorized user not found")
+    if not request.department.strip():
+        raise HTTPException(status_code=400, detail="Department is required")
+    if request.access_level not in {"viewer", "contributor", "approver"}:
+        raise HTTPException(status_code=400, detail="Invalid collaborator access level")
+    existing = db.query(CaseCollaborator).filter(
+        CaseCollaborator.case_id == case_id,
+        CaseCollaborator.user_id == request.user_id,
+    ).first()
+    if existing:
+        existing.department = request.department.strip()
+        existing.access_level = request.access_level
+        db.commit()
+        return {"id": existing.id, "case_id": case_id, "user_id": request.user_id,
+                "department": existing.department, "access_level": existing.access_level}
     collaborator = CaseCollaborator(
         case_id=case_id, user_id=request.user_id,
         department=request.department.strip(), access_level=request.access_level,

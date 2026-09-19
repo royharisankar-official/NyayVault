@@ -58,6 +58,18 @@ async function request(path, options = {}) {
 
 function formatExactDateTime(value) {
   if (!value) return "now";
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return "Invalid date";
+    return new Intl.DateTimeFormat(undefined, {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      timeZoneName: "short",
+    }).format(value);
+  }
   const rawValue = String(value);
   const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(rawValue);
   const date = new Date(hasTimezone ? rawValue : `${rawValue}Z`);
@@ -270,7 +282,7 @@ function App() {
   const loadFeature = async (kind) => {
     try {
       if (kind === "public") {
-        const resources = await request("/public/legal-resources");
+        const resources = await request(`/public/legal-resources?refresh=${Date.now()}`);
         setFeatureData(current => ({...current, public: resources}));
         notify("Public services refreshed");
         return;
@@ -381,11 +393,13 @@ function CaseWorkspace({notify}) {
   const [eventNotes, setEventNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [seeding, setSeeding] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshedAt, setRefreshedAt] = useState(null);
   const seedAttempted = useRef(false);
   const [collaborator, setCollaborator] = useState({user_id:"", department:"Forensic Lab", access_level:"contributor"});
   const loadCases = async (allowDemoSeed = true) => {
     try {
-      const result = await request("/cases/workspace");
+      const result = await request(`/cases/workspace?refresh=${Date.now()}`);
       if (result.length) {
         setCases(result);
         if (!selected || String(selected).startsWith("demo-")) setSelected(String(result[0].id));
@@ -395,7 +409,7 @@ function CaseWorkspace({notify}) {
         setSeeding(true);
         try {
           await request("/cases/demo-seed", {method:"POST"});
-          const seededCases = await request("/cases/workspace");
+          const seededCases = await request(`/cases/workspace?refresh=${Date.now()}`);
           if (seededCases.length) {
             setCases(seededCases);
             setSelected(String(seededCases[0].id));
@@ -406,16 +420,19 @@ function CaseWorkspace({notify}) {
         } finally {
           setSeeding(false);
         }
+        return seededCases;
       }
+      return result;
     } catch (error) {
       setCases(DEMO_CASES);
       setSelected(current => current || DEMO_CASES[0].id);
       notify("Showing illustrative case records");
+      return DEMO_CASES;
     }
   };
   const loadDetail = async (caseId) => {
     if (!caseId) return;
-    try { setDetail(await request(`/cases/${caseId}`)); }
+    try { setDetail(await request(`/cases/${caseId}?refresh=${Date.now()}`)); }
     catch (error) {
       const demo = DEMO_CASES.find(item => String(item.id) === String(caseId));
       if (demo) setDetail(demo);
@@ -432,6 +449,22 @@ function CaseWorkspace({notify}) {
       notify(`${result.created} illustrative case records added`);
     } catch (error) { notify(error.message); } finally { setSeeding(false); }
   };
+  const refreshCaseWorkspace = async () => {
+    if (refreshing || seeding) return;
+    setRefreshing(true);
+    try {
+      const refreshedCases = await loadCases(false);
+      const selectedCase = refreshedCases.find(item => String(item.id) === String(selected)) || refreshedCases[0];
+      if (selectedCase) {
+        setSelected(String(selectedCase.id));
+        await loadDetail(selectedCase.id);
+      }
+      setRefreshedAt(new Date());
+      notify("Case workspace refreshed");
+    } finally {
+      setRefreshing(false);
+    }
+  };
   useEffect(() => { loadCases(); }, []);
   useEffect(() => { if (selected) loadDetail(selected); }, [selected]);
   useEffect(() => { setPublicStatus(null); }, [selected]);
@@ -444,11 +477,26 @@ function CaseWorkspace({notify}) {
     } catch (error) { notify(error.message); } finally { setBusy(false); }
   };
   const addTeamMember = async () => {
-    if (!collaborator.user_id) return;
+    if (busy) return;
+    const userId = Number.parseInt(String(collaborator.user_id).trim(), 10);
+    if (!Number.isInteger(userId) || userId < 1) {
+      notify("Enter a valid authorized user ID");
+      return;
+    }
+    if (String(selected).startsWith("demo-")) {
+      notify("Refresh the case workspace before adding a collaborator");
+      return;
+    }
+    if (!collaborator.department.trim()) {
+      notify("Enter a department");
+      return;
+    }
+    setBusy(true);
     try {
-      await request(`/cases/${selected}/collaborators`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({...collaborator, user_id:Number(collaborator.user_id)})});
+      await request(`/cases/${selected}/collaborators`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({...collaborator, user_id:userId, department:collaborator.department.trim()})});
       setCollaborator({...collaborator, user_id:""}); await loadDetail(selected); notify("Controlled collaborator added");
-    } catch (error) { notify(error.message); }
+    } catch (error) { notify(`Unable to add collaborator: ${error.message}`); }
+    finally { setBusy(false); }
   };
   const askCase = async () => {
     if (!question.trim() || !detail) return;
@@ -472,13 +520,13 @@ function CaseWorkspace({notify}) {
         ? "Review evidence and confirm the next case event"
         : "Review the case status with the authorized team";
   const latestEvent = detail?.timeline?.[detail.timeline.length - 1];
-  return <><PageTitle eyebrow="CASE DETAILS" title="Case workspaces" subtitle="Review authorized case records, chronology, team access and grounded case intelligence." action={<button onClick={() => loadCases(false)} disabled={seeding} className="rounded-xl border border-mint/25 px-4 py-2.5 text-sm font-semibold text-mint disabled:opacity-50">{seeding ? "Loading…" : "Refresh"}</button>}/>
+  return <><PageTitle eyebrow="CASE DETAILS" title="Case workspaces" subtitle="Review authorized case records, chronology, team access and grounded case intelligence." action={<div className="flex flex-col items-end gap-2"><button onClick={refreshCaseWorkspace} disabled={seeding || refreshing} className="rounded-xl border border-mint/25 px-4 py-2.5 text-sm font-semibold text-mint disabled:cursor-wait disabled:opacity-50">{refreshing ? "Refreshing..." : seeding ? "Loading…" : "Refresh"}</button>{refreshedAt && <span className="text-[10px] text-slate-500">Updated {formatExactDateTime(refreshedAt)}</span>}</div>}/>
     <div className="grid gap-5 xl:grid-cols-[.75fr_1.25fr]">
       <section className="rounded-2xl border border-white/10 bg-panel/70 p-5"><div className="mb-4 flex items-center justify-between gap-3"><div className="text-xs font-bold uppercase tracking-widest text-slate-500">Authorized case list</div><span className="rounded-full bg-mint/10 px-2 py-1 text-[10px] text-mint">{cases.length} cases · workspace ready</span></div><div className="space-y-2">{cases.map(item => <button key={item.id} onClick={() => setSelected(String(item.id))} className={`w-full rounded-xl border p-4 text-left transition ${String(item.id) === String(selected) ? "border-mint/40 bg-mint/10" : "border-white/5 bg-white/[.03] hover:border-white/20"}`}><div className="flex items-center justify-between"><span className="font-mono text-xs text-electric">{item.case_number}</span><span className="text-[10px] uppercase text-mint">{item.status.replaceAll("_"," ")}</span></div><div className="mt-2 text-sm font-semibold">{item.title}</div><div className="mt-1 text-xs text-slate-500">{item.fir_number || "No FIR number"} · {item.documents ?? item.document_count ?? 0} protected records</div></button>)}</div><div className="mt-4 border-t border-white/5 pt-3 text-[10px] uppercase tracking-widest text-slate-600">Illustrative case records · secure API sync enabled</div></section>
       <section className="space-y-5">{detail ? <><div className="rounded-2xl border border-white/10 bg-panel/70 p-6"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="font-mono text-xs text-electric">{detail.case_number}</div><h2 className="mt-2 text-2xl font-black">{detail.title}</h2><p className="mt-1 text-sm text-slate-400">{detail.fir_number || "FIR not recorded"} · {detail.police_station || "Police station not recorded"}</p></div><span className="rounded-full bg-mint/10 px-3 py-1 text-xs font-bold uppercase text-mint">{detail.status.replaceAll("_"," ")}</span></div><div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><div className="rounded-xl bg-white/[.03] p-3"><div className="text-[10px] uppercase text-slate-500">Investigating officer</div><div className="mt-1 text-sm font-semibold">{detail.investigating_officer?.name || "Not assigned"}</div><div className="mt-1 text-[10px] text-slate-500">{detail.investigating_officer?.role?.replaceAll("_"," ") || "Team pending"}</div></div><div className="rounded-xl bg-white/[.03] p-3"><div className="text-[10px] uppercase text-slate-500">Sensitivity</div><div className="mt-1 text-sm font-semibold text-amber-300">{detail.sensitivity.replaceAll("_"," ")}</div><div className="mt-1 text-[10px] text-slate-500">Access-controlled workspace</div></div><div className="rounded-xl bg-white/[.03] p-3"><div className="text-[10px] uppercase text-slate-500">Protected records</div><div className="mt-1 text-sm font-semibold text-mint">{detail.documents.length}</div><div className="mt-1 text-[10px] text-slate-500">{detail.timeline.length} timeline events</div></div><div className="rounded-xl bg-white/[.03] p-3"><div className="text-[10px] uppercase text-slate-500">Team access</div><div className="mt-1 text-sm font-semibold text-electric">{detail.team.length} members</div><div className="mt-1 text-[10px] text-slate-500">Controlled collaboration</div></div></div></div>
         <div className="grid gap-3 sm:grid-cols-3"><div className="rounded-2xl border border-electric/20 bg-electric/5 p-4"><div className="text-[10px] font-bold uppercase tracking-wider text-electric">Next recommended milestone</div><p className="mt-2 text-sm leading-5 text-slate-200">{nextMilestone}</p></div><div className="rounded-2xl border border-white/10 bg-panel/70 p-4"><div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Latest verified event</div><p className="mt-2 text-sm font-semibold text-slate-200">{latestEvent?.event_type?.replaceAll("_"," ") || "No event recorded"}</p><p className="mt-1 text-[11px] text-slate-500">{latestEvent?.event_at ? formatExactDateTime(latestEvent.event_at) : "Awaiting update"}</p></div><div className="rounded-2xl border border-white/10 bg-panel/70 p-4"><div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Workspace dates</div><p className="mt-2 text-[11px] text-slate-400">Created: {detail.created_at ? formatExactDateTime(detail.created_at) : "Not available"}</p><p className="mt-1 text-[11px] text-slate-400">Updated: {detail.updated_at ? formatExactDateTime(detail.updated_at) : "Not available"}</p></div></div>
         <div className="grid gap-5 lg:grid-cols-2"><section className="rounded-2xl border border-white/10 bg-panel/70 p-5"><div className="mb-4 flex items-center justify-between"><div><h3 className="font-bold">Case timeline</h3><p className="mt-1 text-xs text-slate-500">FIR registration through judgment</p></div><Activity size={17} className="text-mint"/></div><div className="space-y-3">{detail.timeline.map(item => <div key={item.id} className="flex gap-3"><div className="mt-1 h-2 w-2 rounded-full bg-mint shadow-[0_0_8px_#5ff0c1]"/><div><div className="text-sm font-semibold">{item.event_type.replaceAll("_"," ")}</div><div className="text-xs text-slate-400">{item.notes}</div><div className="mt-1 text-[10px] text-slate-600">{item.event_at ? new Date(item.event_at).toLocaleString() : "now"}</div></div></div>)}</div><div className="mt-4 border-t border-white/5 pt-4"><select value={eventType} onChange={event => setEventType(event.target.value)} className="mb-2 w-full rounded-lg border border-white/10 bg-ink px-3 py-2 text-xs"><option value="fir_registered">FIR registered</option><option value="investigation_started">Investigation started</option><option value="evidence_collected">Evidence collected</option><option value="charge_sheet_prepared">Charge sheet prepared</option><option value="court_filing">Court filing</option><option value="judgment">Judgment</option></select><textarea value={eventNotes} onChange={event => setEventNotes(event.target.value)} placeholder="Add a verified case event note…" className="w-full rounded-lg border border-white/10 bg-ink p-3 text-xs" rows="2"/><button onClick={addEvent} disabled={busy} className="mt-2 rounded-lg bg-mint px-3 py-2 text-xs font-bold text-ink">Add timeline event</button></div></section>
-        <section className="rounded-2xl border border-white/10 bg-panel/70 p-5"><div className="mb-4 flex items-center justify-between"><div><h3 className="font-bold">Case team</h3><p className="mt-1 text-xs text-slate-500">Controlled inter-agency access</p></div><Users size={17} className="text-electric"/></div><div className="space-y-2">{detail.team.map(member => <div key={`${member.user_id}-${member.department}`} className="flex items-center justify-between rounded-xl bg-white/[.03] p-3"><div><div className="text-sm font-semibold">{member.name}</div><div className="text-xs text-slate-500">{member.department} · {member.role}</div></div><span className="text-[10px] uppercase text-mint">{member.access_level}</span></div>)}</div><div className="mt-4 border-t border-white/5 pt-4"><input value={collaborator.user_id} onChange={event => setCollaborator({...collaborator,user_id:event.target.value})} placeholder="Authorized user ID" className="mb-2 w-full rounded-lg border border-white/10 bg-ink px-3 py-2 text-xs"/><div className="grid grid-cols-2 gap-2"><input value={collaborator.department} onChange={event => setCollaborator({...collaborator,department:event.target.value})} placeholder="Department" className="rounded-lg border border-white/10 bg-ink px-3 py-2 text-xs"/><select value={collaborator.access_level} onChange={event => setCollaborator({...collaborator,access_level:event.target.value})} className="rounded-lg border border-white/10 bg-ink px-3 py-2 text-xs"><option value="viewer">Viewer</option><option value="contributor">Contributor</option><option value="approver">Approver</option></select></div><button onClick={addTeamMember} className="mt-2 rounded-lg border border-electric/25 px-3 py-2 text-xs font-semibold text-electric">Add collaborator</button></div></section></div>
+        <section className="rounded-2xl border border-white/10 bg-panel/70 p-5"><div className="mb-4 flex items-center justify-between"><div><h3 className="font-bold">Case team</h3><p className="mt-1 text-xs text-slate-500">Controlled inter-agency access</p></div><Users size={17} className="text-electric"/></div><div className="space-y-2">{detail.team.map(member => <div key={`${member.user_id}-${member.department}`} className="flex items-center justify-between rounded-xl bg-white/[.03] p-3"><div><div className="text-sm font-semibold">{member.name}</div><div className="text-xs text-slate-500">{member.department} · {member.role}</div></div><span className="text-[10px] uppercase text-mint">{member.access_level}</span></div>)}</div><div className="mt-4 border-t border-white/5 pt-4"><input value={collaborator.user_id} onChange={event => setCollaborator({...collaborator,user_id:event.target.value})} placeholder="Authorized user ID" inputMode="numeric" className="mb-2 w-full rounded-lg border border-white/10 bg-ink px-3 py-2 text-xs"/><div className="grid grid-cols-2 gap-2"><input value={collaborator.department} onChange={event => setCollaborator({...collaborator,department:event.target.value})} placeholder="Department" className="rounded-lg border border-white/10 bg-ink px-3 py-2 text-xs"/><select value={collaborator.access_level} onChange={event => setCollaborator({...collaborator,access_level:event.target.value})} className="rounded-lg border border-white/10 bg-ink px-3 py-2 text-xs"><option value="viewer">Viewer</option><option value="contributor">Contributor</option><option value="approver">Approver</option></select></div><button onClick={addTeamMember} disabled={busy} className="mt-2 rounded-lg border border-electric/25 px-3 py-2 text-xs font-semibold text-electric disabled:cursor-wait disabled:opacity-50">{busy ? "Adding..." : "Add collaborator"}</button></div></section></div>
         <section className="rounded-2xl border border-electric/20 bg-electric/5 p-5"><div className="mb-3 flex items-center gap-2"><BrainCircuit size={17} className="text-electric"/><div><h3 className="font-bold">Case-specific Ask</h3><p className="text-xs text-slate-500">Answers are limited to this case’s authorized documents.</p></div></div><div className="flex gap-2"><input value={question} onChange={event => setQuestion(event.target.value)} placeholder={`Ask about ${selectedSummary?.case_number || "this case"}…`} className="flex-1 rounded-lg border border-white/10 bg-ink px-3 py-3 text-sm"/><button onClick={askCase} className="rounded-lg bg-electric px-4 py-2 text-xs font-bold text-ink">Ask</button></div>{aiResult && <div className="mt-4 rounded-xl border border-white/10 bg-panel/80 p-4 text-sm"><p className="leading-6 text-slate-300">{aiResult.answer}</p><div className="mt-3 text-xs text-slate-500">{aiResult.sources?.length || 0} authorized source(s) · {aiResult.verified ? "verified against retrieved records" : "human review required"}</div></div>}<div className="mt-5 border-t border-white/10 pt-4"><div className="flex items-center justify-between gap-3"><div><div className="text-xs font-semibold text-slate-300">Public status exchange</div><div className="text-[11px] text-slate-500">Publishes a safe snapshot only; the public tier never reads the secure repository.</div></div><button onClick={publishPublicStatus} className="rounded-lg border border-mint/25 px-3 py-2 text-xs font-semibold text-mint">Publish approved status</button></div>{publicStatus && <div className="mt-3 rounded-lg bg-mint/5 p-3 text-xs text-mint">Verification code: <span className="font-mono font-bold">{publicStatus.verification_code}</span> · Share this code with the authorized complainant.</div>}</div></section></> : <div className="rounded-2xl border border-white/10 bg-panel/70 p-10 text-center text-sm text-slate-500">Select an authorized case to open its workspace.</div>}</section>
     </div></>;
 }
@@ -773,7 +821,7 @@ function PublicAskNyAI({load, notify}) {
     setLibraryLoading(true);
     setPublicError("");
     try {
-      const response = await request("/public/legal-resources");
+      const response = await request(`/public/legal-resources?refresh=${Date.now()}`);
       setLibraryResources(response.resources || []);
     } catch (error) {
       setPublicError(error.message);
@@ -1086,14 +1134,14 @@ function DocumentRow({doc, onOpen}) {
         request(`/documents/${doc.id}/classify`, {method: "POST"}),
         request(`/documents/${doc.id}/summarize`, {method: "POST"}),
       ]);
-      setAnalysis({classification: classification.classification, summary: summary.summary});
+      setAnalysis({...summary, classification: classification.classification});
     } catch (analysisError) { setError(analysisError.message); }
   };
-  const geminiAnalyze = async () => {
+  const aiSummary = async () => {
     try {
       const result = await request(`/documents/${doc.id}/summarize/gemini`, {method: "POST"});
-      setAnalysis(current => ({classification: current?.classification || doc.classification || doc.document_type, summary: result.summary}));
-    } catch (geminiError) { setError(geminiError.message); }
+      setAnalysis(current => ({...result, classification: current?.classification || doc.classification || doc.document_type}));
+    } catch (summaryError) { setError(summaryError.message); }
   };
   const share = async () => {
     const recipient = window.prompt("Share with email or department:");
@@ -1122,7 +1170,7 @@ function DocumentRow({doc, onOpen}) {
       });
     } catch (versionError) { setError(versionError.message); }
   };
-  return <div className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-panel/70 p-5 transition hover:border-mint/25 sm:flex-row sm:items-center"><div className="flex min-w-0 flex-1 items-center gap-4"><div className="rounded-xl bg-mint/10 p-3 text-mint"><FileText size={21}/></div><div className="min-w-0"><div className="mb-1 flex items-center gap-2"><span className="rounded bg-mint/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-mint">{doc.document_type}</span><span className="rounded bg-amber-300/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-amber-300">{doc.sensitivity || "confidential"}</span>{doc.encrypted && <FileLock2 size={13} className="text-electric"/>}{doc.signed && <BadgeCheck size={14} className="text-amber-300"/>}</div><h3 className="truncate font-semibold">{doc.title}</h3><p className="truncate text-xs text-slate-500">{doc.filename} · SHA-256 {doc.sha256?.slice(0,12)}… · v{doc.version} · uploaded {doc.created_at ? new Date(doc.created_at).toLocaleString() : "unknown"}</p>{analysis && <div className="mt-2 rounded-lg bg-electric/5 p-2 text-xs"><span className="font-semibold text-electric">AI: {analysis.classification}</span><p className="mt-1 text-slate-400">{analysis.summary}</p></div>}{showVersions && <div className="mt-2 rounded-lg border border-white/5 bg-white/[.03] p-2 text-xs"><div className="mb-2 font-semibold text-slate-300">Version history</div>{versions.length ? versions.map(version => <div key={version.id} className="flex items-center justify-between border-t border-white/5 py-1.5">  <span>v{version.version} · {version.sha256.slice(0,10)}… {version.is_current && <span className="text-mint">(current)</span>}</span><button onClick={() => downloadVersion(version)} className="text-electric hover:text-white">Download</button></div>) : <span className="text-slate-500">No version records yet.</span>}</div>}{shareUrl && <p className="mt-2 break-all text-[11px] text-mint">Share link: {shareUrl}</p>}{error && <p className="mt-1 text-xs text-red-300">{error}</p>}</div></div><div className="flex flex-wrap items-center gap-2"><button onClick={onOpen} className="rounded-lg border border-mint/25 px-3 py-2 text-xs font-semibold text-mint hover:bg-mint/10">Open viewer</button><button onClick={analyze} className="rounded-lg border border-electric/20 px-3 py-2 text-xs font-semibold text-electric hover:bg-electric/10">AI analyze</button><button onClick={geminiAnalyze} className="rounded-lg border border-purple-300/25 px-3 py-2 text-xs font-semibold text-purple-300 hover:bg-purple-300/10">Gemini summary</button><button onClick={loadVersions} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 hover:border-electric/30 hover:text-electric">Versions</button><button onClick={share} className="rounded-lg border border-mint/20 px-3 py-2 text-xs font-semibold text-mint hover:bg-mint/10">Share</button><button onClick={handleDownload} disabled={busy} className="flex items-center justify-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 hover:border-mint/30 hover:text-mint disabled:cursor-wait disabled:opacity-60">{busy ? "Verifying…" : "Verify & download"} <ArrowUpRight size={14}/></button></div></div>;
+  return <div className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-panel/70 p-5 transition hover:border-mint/25 sm:flex-row sm:items-center"><div className="flex min-w-0 flex-1 items-center gap-4"><div className="rounded-xl bg-mint/10 p-3 text-mint"><FileText size={21}/></div><div className="min-w-0"><div className="mb-1 flex items-center gap-2"><span className="rounded bg-mint/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-mint">{doc.document_type}</span><span className="rounded bg-amber-300/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-amber-300">{doc.sensitivity || "confidential"}</span>{doc.encrypted && <FileLock2 size={13} className="text-electric"/>}{doc.signed && <BadgeCheck size={14} className="text-amber-300"/>}</div><h3 className="truncate font-semibold">{doc.title}</h3><p className="truncate text-xs text-slate-500">{doc.filename} · SHA-256 {doc.sha256?.slice(0,12)}… · v{doc.version} · uploaded {doc.created_at ? new Date(doc.created_at).toLocaleString() : "unknown"}</p>{analysis &&   <div className="mt-2 rounded-lg bg-electric/5 p-3 text-xs"><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold text-electric">{analysis.provider === "gemini" ? "Gemini Summary" : "AI analysis"} · {analysis.classification}</span><span className="text-[10px] uppercase text-mint">{analysis.provider || "local-analytical"} · {analysis.confidence || "medium"} confidence</span></div><p className="mt-2 text-slate-300">{analysis.summary}</p>{analysis.key_points?.length > 0 && <div className="mt-3"><div className="font-semibold text-slate-300">Key points</div><ul className="mt-1 list-disc space-y-1 pl-4 text-slate-400">{analysis.key_points.map(point => <li key={point}>{point}</li>)}</ul></div>}{analysis.entities && <div className="mt-3 grid gap-1 text-slate-400 sm:grid-cols-2">{Object.entries(analysis.entities).filter(([,items]) => items?.length).map(([label, items]) => <div key={label}><span className="font-semibold capitalize text-slate-300">{label.replaceAll("_", " ")}:</span> {items.join(", ")}</div>)}</div>}{analysis.risk_flags?.length > 0 && <div className="mt-3"><div className="font-semibold text-amber-300">Risk flags</div><ul className="mt-1 list-disc space-y-1 pl-4 text-slate-400">{analysis.risk_flags.map(flag => <li key={flag}>{flag}</li>)}</ul></div>}{analysis.recommended_actions?.length > 0 && <div className="mt-3"><div className="font-semibold text-mint">Recommended actions</div><ul className="mt-1 list-disc space-y-1 pl-4 text-slate-400">{analysis.recommended_actions.map(action => <li key={action}>{action}</li>)}</ul></div>}{analysis.open_questions?.length > 0 && <div className="mt-3"><div className="font-semibold text-electric">Open questions</div><ul className="mt-1 list-disc space-y-1 pl-4 text-slate-400">{analysis.open_questions.map(question => <li key={question}>{question}</li>)}</ul></div>}{analysis.limitations?.length > 0 && <p className="mt-3 border-t border-white/10 pt-2 text-[10px] text-slate-500">{analysis.limitations.join(" ")}</p>}</div>}{showVersions && <div className="mt-2 rounded-lg border border-white/5 bg-white/[.03] p-2 text-xs"><div className="mb-2 font-semibold text-slate-300">Version history</div>{versions.length ? versions.map(version => <div key={version.id} className="flex items-center justify-between border-t border-white/5 py-1.5">  <span>v{version.version} · {version.sha256.slice(0,10)}… {version.is_current && <span className="text-mint">(current)</span>}</span><button onClick={() => downloadVersion(version)} className="text-electric hover:text-white">Download</button></div>) : <span className="text-slate-500">No version records yet.</span>}</div>}{shareUrl && <p className="mt-2 break-all text-[11px] text-mint">Share link: {shareUrl}</p>}{error && <p className="mt-1 text-xs text-red-300">{error}</p>}</div></div><div className="flex flex-wrap items-center gap-2"><button onClick={onOpen} className="rounded-lg border border-mint/25 px-3 py-2 text-xs font-semibold text-mint hover:bg-mint/10">Open viewer</button><button onClick={analyze} className="rounded-lg border border-electric/20 px-3 py-2 text-xs font-semibold text-electric hover:bg-electric/10">AI analyze</button><button onClick={aiSummary} className="rounded-lg border border-purple-300/25 px-3 py-2 text-xs font-semibold text-purple-300 hover:bg-purple-300/10">Gemini Summary</button><button onClick={loadVersions} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 hover:border-electric/30 hover:text-electric">Versions</button><button onClick={share} className="rounded-lg border border-mint/20 px-3 py-2 text-xs font-semibold text-mint hover:bg-mint/10">Share</button><button onClick={handleDownload} disabled={busy} className="flex items-center justify-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 hover:border-mint/30 hover:text-mint disabled:cursor-wait disabled:opacity-60">{busy ? "Verifying…" : "Verify & download"} <ArrowUpRight size={14}/></button></div></div>;
 }
 
 function DocumentViewer({document, onBack, onReset, onUpload}) {
@@ -1130,7 +1178,15 @@ function DocumentViewer({document, onBack, onReset, onUpload}) {
   const [previewUrl, setPreviewUrl] = useState("");
   const [previewLoading, setPreviewLoading] = useState(false);
   const loadVerification = async () => {
-    try { setVerification(await request(`/documents/${document.id}/verify`)); }
+    try {
+      const current = await request(`/documents/${document.id}/verify`);
+      if (current.sha256?.valid && current.signature?.valid && !current.blockchain?.anchored) {
+        await request(`/documents/${document.id}/anchor`, {method: "POST"});
+        setVerification(await request(`/documents/${document.id}/verify?refresh=${Date.now()}`));
+      } else {
+        setVerification(current);
+      }
+    }
     catch (error) { setVerification({error: error.message}); }
   };
   const loadPreview = async () => {

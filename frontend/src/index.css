@@ -147,6 +147,7 @@ option { color: #e8f0fb; background-color: #0d1b2e; }
 .light .border-white\/10 { border-color: rgba(42,73,96,.16); }
 .light .border-white\/5 { border-color: rgba(42,73,96,.1); }
 .light .text-white, .light .text-slate-100 { color: #17243a; }
+.light .text-slate-200 { color: #34445d; }
 .light .text-slate-300 { color: #34445d; }
 .light .text-slate-400 { color: #586a82; }
 .light .text-slate-500, .light .text-slate-600 { color: #718198; }

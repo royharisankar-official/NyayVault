@@ -1354,10 +1354,12 @@ function Auth({onDone,notify}) {
   const [loading,setLoading] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState("");
   const [authError, setAuthError] = useState("");
+  const [resetNotice, setResetNotice] = useState("");
   const submitResetRequest = async (event) => {
     event.preventDefault();
     setLoading(true);
     setAuthError("");
+    setResetNotice("");
     const values = Object.fromEntries(new FormData(event.currentTarget));
     const email = String(values.email || "").trim().toLowerCase();
     try {
@@ -1368,8 +1370,10 @@ function Auth({onDone,notify}) {
       if (result.reset_token) {
         setResetToken(result.reset_token);
         setRegisteredEmail(email);
+        setResetNotice("Reset token generated. Copy it below, then choose your new password.");
         notify("Reset token generated. It expires in 15 minutes.");
       } else {
+        setResetNotice("No active account was found for that email. Register the account first, then request a reset.");
         notify(result.message);
       }
     } catch (error) {
@@ -1380,6 +1384,7 @@ function Auth({onDone,notify}) {
     event.preventDefault();
     setLoading(true);
     setAuthError("");
+    setResetNotice("");
     const values = Object.fromEntries(new FormData(event.currentTarget));
     if (values.password !== values.confirm_password) {
       setAuthError("Passwords do not match");
@@ -1394,7 +1399,6 @@ function Auth({onDone,notify}) {
       setForgot(false);
       setRegister(false);
       setResetToken("");
-      setRegisteredEmail(String(values.email || registeredEmail));
       notify("Password updated. Please sign in.");
     } catch (error) {
       setAuthError(error.message);
@@ -1449,8 +1453,9 @@ function Auth({onDone,notify}) {
           <label>Work email<input name="email" required type="email" autoComplete="email" placeholder="name@organization.gov" /></label>
           <button type="submit" disabled={loading}>{loading ? "Generating…" : "Generate reset token"} <ArrowUpRight size={15}/></button>
         </form>}
+        {resetNotice && <div role="status" className={`mt-4 rounded-xl border px-3 py-2 text-xs leading-5 ${resetToken ? "border-mint/20 bg-mint/5 text-mint" : "border-amber-300/20 bg-amber-300/10 text-amber-200"}`}>{resetNotice}</div>}
         {forgot && resetToken && <form key="forgot-confirm" onSubmit={submitReset} className="auth-form">
-          <div className="rounded-xl border border-mint/20 bg-mint/5 p-3 text-[11px] leading-5 text-mint">One-time reset token generated for this demo. Keep it private and complete the reset before it expires.</div>
+          <label>One-time reset token<input value={resetToken} readOnly onFocus={event => event.target.select()} className="font-mono text-[11px]" aria-label="One-time reset token" /></label>
           <label>New password<input name="password" required minLength="8" type="password" autoComplete="new-password" placeholder="Minimum 8 characters" /></label>
           <label>Confirm password<input name="confirm_password" required minLength="8" type="password" autoComplete="new-password" placeholder="Repeat your new password" /></label>
           <button type="submit" disabled={loading}>{loading ? "Updating…" : "Update password"} <ArrowUpRight size={15}/></button>

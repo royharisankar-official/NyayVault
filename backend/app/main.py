@@ -127,6 +127,37 @@ def _release_audit_write_lock(session):
 Base.metadata.create_all(bind=engine)
 settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+# One-time cleanup for records explicitly requested for removal during deployment.
+purge_titles = {
+    title.strip().casefold()
+    for title in os.getenv("PURGE_DOCUMENT_TITLES", "").split(",")
+    if title.strip()
+}
+if purge_titles:
+    with SessionLocal() as cleanup_db:
+        purge_documents = cleanup_db.query(Document).filter(
+            Document.title.is_not(None)
+        ).all()
+        for document in purge_documents:
+            if document.title.casefold() not in purge_titles:
+                continue
+            file_paths = [document.file_path]
+            file_paths.extend(
+                version.file_path
+                for version in cleanup_db.query(DocumentVersion).filter(
+                    DocumentVersion.document_id == document.id
+                ).all()
+            )
+            for model in (DocumentVersion, DocumentShare, Permission, BlockchainRecord):
+                cleanup_db.query(model).filter(model.document_id == document.id).delete(
+                    synchronize_session=False
+                )
+            cleanup_db.delete(document)
+            for file_path in file_paths:
+                if file_path:
+                    Path(file_path).unlink(missing_ok=True)
+        cleanup_db.commit()
+
 # Keep the prototype compatible with the database created by earlier versions.
 if engine.url.get_backend_name() == "sqlite":
     columns = {column["name"] for column in inspect(engine).get_columns("documents")}

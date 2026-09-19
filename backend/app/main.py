@@ -118,6 +118,26 @@ SEARCH_STOPWORDS = {
 _audit_write_lock = threading.Lock()
 
 
+def persistent_data_dir() -> Path:
+    if engine.url.get_backend_name() == "sqlite" and engine.url.database:
+        database_path = Path(engine.url.database)
+        return database_path.parent if database_path.is_absolute() else (Path.cwd() / database_path).resolve().parent
+    return settings.BASE_DIR
+
+
+def backup_directory() -> Path:
+    destination = persistent_data_dir() / "backups"
+    destination.mkdir(parents=True, exist_ok=True)
+    return destination
+
+
+def sqlite_database_path() -> Path | None:
+    if engine.url.get_backend_name() != "sqlite" or not engine.url.database:
+        return None
+    database_path = Path(engine.url.database)
+    return database_path if database_path.is_absolute() else (Path.cwd() / database_path).resolve()
+
+
 @event.listens_for(Session, "after_commit")
 @event.listens_for(Session, "after_rollback")
 def _release_audit_write_lock(session):
@@ -125,6 +145,9 @@ def _release_audit_write_lock(session):
         _audit_write_lock.release()
 
 Base.metadata.create_all(bind=engine)
+if engine.url.get_backend_name() == "sqlite" and engine.url.database and Path(engine.url.database).is_absolute():
+    settings.UPLOAD_DIR = persistent_data_dir() / "uploads"
+    settings.MEDIA_DIR = persistent_data_dir() / "media"
 settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # Keep the prototype compatible with the database created by earlier versions.
@@ -2265,15 +2288,13 @@ def cloud_storage_status(user: User = Depends(current_user)):
 @app.post("/api/backups")
 def create_backup(db: Session = Depends(get_db),
                   user: User = Depends(require_admin_mfa)):
-    backup_dir = settings.BASE_DIR / "backups"
-    backup_dir.mkdir(parents=True, exist_ok=True)
+    backup_dir = backup_directory()
     filename = f"ask-nyai-backup-{secrets.token_hex(6)}.zip"
     destination = backup_dir / filename
     with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as archive:
-        if engine.url.get_backend_name() == "sqlite" and engine.url.database:
-            database_path = Path(engine.url.database)
-            if database_path.is_file():
-                archive.write(database_path, "database/dms.db")
+        database_path = sqlite_database_path()
+        if database_path and database_path.is_file():
+            archive.write(database_path, "database/dms.db")
         for file_path in settings.UPLOAD_DIR.glob("*"):
             if file_path.is_file() and file_path.name != filename:
                 archive.write(file_path, f"uploads/{file_path.name}")
@@ -2300,7 +2321,7 @@ def list_backups(db: Session = Depends(get_db),
 def download_backup(filename: str, db: Session = Depends(get_db),
                     user: User = Depends(require_admin_mfa)):
     safe_name = Path(filename).name
-    backup_path = settings.BASE_DIR / "backups" / safe_name
+    backup_path = backup_directory() / safe_name
     if safe_name != filename or not backup_path.is_file():
         raise HTTPException(status_code=404, detail="Backup not found")
     write_audit(db, "admin.backup_downloaded", "backup", user.id, None,

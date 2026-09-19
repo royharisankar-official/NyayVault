@@ -10,5 +10,3 @@ services:
         generateValue: true
       - key: DATABASE_URL
         value: sqlite:////app/data/dms.db
-      - key: PURGE_DOCUMENT_TITLES
-        value: previewFormOrdinaryDetail,Online Application Receipt,Application_Details

@@ -766,17 +766,25 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(current_user))
         counts[document.document_type] = counts.get(document.document_type, 0) + 1
     activities = db.query(AuditLog).order_by(desc(AuditLog.id)).limit(8).all()
     users = {u.id: u.full_name for u in db.query(User).all()}
+    latest_anchor = db.query(ChainAnchor).order_by(desc(ChainAnchor.id)).first()
+    security_alerts = []
+    if latest_anchor:
+        anchored_audit = db.query(AuditLog).filter(
+            AuditLog.entry_hash == latest_anchor.audit_head
+        ).first()
+        if latest_anchor.audit_head != "GENESIS" and not anchored_audit:
+            security_alerts.append({
+                "title": "Integrity verification required",
+                "message": "Review the latest audit and integrity status before release.",
+                "severity": "medium",
+            })
     return {
         "total_documents": len(documents),
         "active_cases": len(cases),
         "pending_actions": db.query(Notification).filter(
             Notification.user_id == user.id, Notification.status == "pending"
         ).count(),
-        "security_alerts": [{
-            "title": "Integrity verification required",
-            "message": "Review the latest audit and integrity status before release.",
-            "severity": "medium",
-        }] if not db.query(ChainAnchor).first() else [],
+        "security_alerts": security_alerts,
         "recent_cases": [{
             "id": item.id, "case_number": item.case_number, "title": item.title,
             "status": item.status, "updated_at": (item.updated_at or item.created_at).isoformat()

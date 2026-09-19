@@ -872,9 +872,6 @@ def list_documents(q: str = "", document_type: str = "", db: Session = Depends(g
         )).lower()]
     if document_type:
         documents = [item for item in documents if item.document_type == document_type]
-    write_audit(db, "document.listed", "document", user.id, None,
-                {"query": q.strip(), "document_type": document_type, "result_count": len(documents)})
-    db.commit()
     return [serialize_document(item) for item in documents]
 
 

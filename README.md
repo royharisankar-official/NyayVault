@@ -3,6 +3,26 @@
 This prototype can be packaged with a self-contained Windows Python runtime,
 so it does not rely on the drive letter or the developer's machine paths.
 
+## Live website
+
+**Open NyayVault:** [https://nyayvault.onrender.com](https://nyayvault.onrender.com)
+
+### Quick start
+
+1. Open the live website link above.
+2. Register a new account on the first screen.
+3. Sign in and open the dashboard.
+4. Use **Document Vault** to upload records, **Ask NyAI** for source-based
+   assistance, and **Audit & Integrity** to review the audit trail.
+5. Use the **Verify chain** button to check the available audit history.
+
+API health check: [https://nyayvault.onrender.com/health](https://nyayvault.onrender.com/health)  
+Interactive API documentation: [https://nyayvault.onrender.com/docs](https://nyayvault.onrender.com/docs)
+
+> This is a demonstration deployment. Do not upload real confidential legal
+> records. Render's default filesystem is ephemeral, so uploaded data may not
+> persist across service replacement or redeployment.
+
 ## Recommended way to run on Windows
 
 1. Copy the complete `Prototype 2` folder to the USB drive (do not copy only

@@ -24,8 +24,9 @@ API health check: [https://nyayvault.onrender.com/health](https://nyayvault.onre
 Interactive API documentation: [https://nyayvault.onrender.com/docs](https://nyayvault.onrender.com/docs)
 
 > This is a demonstration deployment. Do not upload real confidential legal
-> records. Render's default filesystem is ephemeral, so uploaded data may not
-> persist across service replacement or redeployment.
+> records. The Render service uses a persistent disk for the SQLite database,
+> so registered users survive normal redeployments. Uploaded files remain
+> subject to the configured storage and backup setup.
 
 ## Recommended way to run on Windows
 
@@ -93,9 +94,9 @@ the Blueprint. The image builds the Vite frontend inside Docker, so a local
 `frontend\dist` folder is not required in Git. The service listens on Render's
 `PORT` environment variable and uses `/health` for health checks.
 
-The default SQLite database and uploaded files use the container filesystem.
-They are suitable for a demo, but Render's filesystem is ephemeral; configure a
-persistent disk or an external database/object store before production use.
+The SQLite database is mounted on a Render persistent disk by `render.yaml`, so
+user accounts and application records survive normal service replacements.
+Configure external database and object storage services before production use.
 
 This is a demonstration prototype. Replace default secrets and review data
 protection before using it with real confidential documents.

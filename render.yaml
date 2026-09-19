@@ -5,6 +5,10 @@ services:
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /health
+    disk:
+      name: nyayvault-data
+      mountPath: /app/data
+      sizeGB: 1
     envVars:
       - key: SECRET_KEY
         generateValue: true

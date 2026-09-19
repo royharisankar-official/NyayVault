@@ -14,11 +14,6 @@ import "./index.css";
 const API = "/api";
 const PRODUCT_NAME = "NyayVault";
 const tokenKey = "dms_token";
-const authResetVersion = "auth-reset-v1";
-if (localStorage.getItem("dms_auth_reset") !== authResetVersion) {
-  localStorage.removeItem(tokenKey);
-  localStorage.setItem("dms_auth_reset", authResetVersion);
-}
 const themeDefaultVersion = "light-default-v2";
 const launchTheme = new URLSearchParams(window.location.search).get("theme");
 const storedThemeVersion = localStorage.getItem("dms_theme_default");

@@ -133,6 +133,13 @@ option { color: #e8f0fb; background-color: #0d1b2e; }
 .boot-pulse { margin-top: 30px; color: rgba(136,160,185,.68); animation: boot-pulse 2s ease-in-out infinite; }
 
 .light { color-scheme: light; background: #eef4f7; }
+.light .boot-screen { color: #17243a; background: radial-gradient(circle at 50% 42%, #d8f4ef 0, #eef4f7 42%, #e3edf2 100%); }
+.light .boot-grid { opacity: .4; background-image: linear-gradient(rgba(22,143,120,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(22,143,120,.1) 1px, transparent 1px); }
+.light .boot-orbit { border-color: rgba(22,143,120,.2); }
+.light .boot-orbit-two { border-color: rgba(57,118,214,.16); }
+.light .boot-kicker { color: #586a82; }
+.light .boot-status { color: #34445d; }
+.light .boot-pulse { color: rgba(88,106,130,.8); }
 .light body { color: #17243a; background: radial-gradient(circle at 82% -12%, #c8eee7 0, #eef4f7 42%, #e7eef3 100%); }
 .light .bg-ink { background-color: #eef4f7; }
 .light .bg-ink\/50,

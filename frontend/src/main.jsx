@@ -19,8 +19,15 @@ if (localStorage.getItem("dms_auth_reset") !== authResetVersion) {
   localStorage.removeItem(tokenKey);
   localStorage.setItem("dms_auth_reset", authResetVersion);
 }
-const themeDefaultVersion = "dark-default-v1";
+const themeDefaultVersion = "light-default-v2";
 const launchTheme = new URLSearchParams(window.location.search).get("theme");
+const storedThemeVersion = localStorage.getItem("dms_theme_default");
+const initialTheme = launchTheme === "light" || launchTheme === "dark"
+  ? launchTheme
+  : storedThemeVersion === themeDefaultVersion
+    ? localStorage.getItem("dms_theme") || "light"
+    : "light";
+document.documentElement.classList.toggle("light", initialTheme === "light");
 const nav = [
   { id: "overview", label: "Dashboard", icon: Gauge },
   { id: "cases", label: "Case Details", icon: BriefcaseBusiness },
@@ -165,11 +172,11 @@ function App() {
   const [theme, setTheme] = useState(() => {
     if (launchTheme === "light" || launchTheme === "dark") return launchTheme;
     if (localStorage.getItem("dms_theme_default") !== themeDefaultVersion) {
-      localStorage.setItem("dms_theme", "dark");
+      localStorage.setItem("dms_theme", "light");
       localStorage.setItem("dms_theme_default", themeDefaultVersion);
-      return "dark";
+      return "light";
     }
-    return localStorage.getItem("dms_theme") || "dark";
+    return localStorage.getItem("dms_theme") || "light";
   });
   const [searchLoading, setSearchLoading] = useState(false);
   const [documentType, setDocumentType] = useState("");

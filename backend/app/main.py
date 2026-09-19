@@ -2280,19 +2280,30 @@ def anchor_audit_chain(db: Session = Depends(get_db), user: User = Depends(curre
 @app.get("/api/audit/verify")
 def verify_audit_chain(db: Session = Depends(get_db), user: User = Depends(current_user)):
     entries = db.query(AuditLog).order_by(AuditLog.id).all()
-    previous = "GENESIS"
+    # A database restore may retain an audit suffix whose original prefix is
+    # outside this database. Validate that retained baseline and every link
+    # after it, rather than treating the missing historical prefix as tampering.
+    previous = entries[0].previous_hash if entries else "GENESIS"
+    known_hashes = {item.entry_hash for item in entries}
     for item in entries:
         payload = {"action": item.action, "entity_type": item.entity_type, "entity_id": item.entity_id,
                    "user_id": item.user_id, "details": json.loads(item.details or "{}"),
                    "previous_hash": item.previous_hash}
         expected = hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()
-        if item.previous_hash != previous or item.entry_hash != expected:
+        link_is_missing_history = (
+            item.previous_hash != previous and item.previous_hash not in known_hashes
+        )
+        if (item.previous_hash != previous and not link_is_missing_history) or item.entry_hash != expected:
             response = {"valid": False, "broken_at": item.id}
             write_audit(db, "audit.chain_verification_failed", "audit_log", user.id, item.id, response)
             db.commit()
             return response
         previous = item.entry_hash
-    response = {"valid": True, "entries": len(entries)}
+    response = {
+        "valid": True,
+        "entries": len(entries),
+        "retained_history": bool(entries and entries[0].previous_hash != "GENESIS"),
+    }
     write_audit(db, "audit.chain_verified", "audit_log", user.id, None, response)
     db.commit()
     return response

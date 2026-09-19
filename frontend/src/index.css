@@ -33,7 +33,7 @@ option { color: #e8f0fb; background-color: #0d1b2e; }
 .font-mono { font-family: "DM Mono", ui-monospace, monospace; }
 .bg-panel::after { content: ""; position: absolute; inset: 0 auto 0 -70%; width: 45%; pointer-events: none; background: linear-gradient(105deg, transparent, rgba(255,255,255,.06), transparent); animation: shimmer 8s ease-in-out infinite; }
 .theme-toggle { animation: pulse-ring 3.5s ease-out infinite; }
-.auth-shell { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; overflow: auto; padding: 28px; color: #e8f0fb; background: radial-gradient(circle at 15% 20%, #173d56 0, #0a1a2b 38%, #050c16 100%); }
+.auth-shell { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; overflow: auto; overscroll-behavior: contain; padding: 28px; color: #e8f0fb; background: radial-gradient(circle at 15% 20%, #173d56 0, #0a1a2b 38%, #050c16 100%); }
 .auth-grid { position: absolute; inset: 0; opacity: .25; background-image: linear-gradient(rgba(86,224,189,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(86,224,189,.1) 1px, transparent 1px); background-size: 38px 38px; mask-image: linear-gradient(90deg, black, transparent 82%); }
 .auth-ambient { position: absolute; border-radius: 50%; filter: blur(2px); pointer-events: none; }
 .auth-ambient-one { width: 360px; height: 360px; top: -140px; left: -90px; background: rgba(86,224,189,.16); animation: auth-drift 9s ease-in-out infinite; }

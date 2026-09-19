@@ -209,6 +209,18 @@ function App() {
     else setShowAuth(true);
   }, []);
   useEffect(() => {
+    const documentElementOverflow = document.documentElement.style.overflow;
+    const bodyOverflow = document.body.style.overflow;
+    if (showAuth) {
+      document.documentElement.style.overflow = "hidden";
+      document.body.style.overflow = "hidden";
+    }
+    return () => {
+      document.documentElement.style.overflow = documentElementOverflow;
+      document.body.style.overflow = bodyOverflow;
+    };
+  }, [showAuth]);
+  useEffect(() => {
     if (view === "overview" && localStorage.getItem(tokenKey)) refresh();
   }, [view]);
   const runSearch = async (scope, value, type, filters = {}) => {

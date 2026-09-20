@@ -213,10 +213,11 @@ option { color: #e8f0fb; background-color: #0d1b2e; }
   .auth-ambient-one { width: 300px; height: 300px; top: -110px; left: -120px; opacity: .9; }
   .auth-ambient-two { width: 260px; height: 260px; right: -100px; bottom: -80px; opacity: .85; }
   .auth-layout { grid-template-columns: 1fr; gap: 24px; max-width: 480px; }
-  .auth-story { display: none; }
+  .auth-story { display: block; text-align: left; }
   .auth-story-badge { margin: 0 auto; }
   .auth-story h1 { font-size: clamp(38px, 11vw, 54px); }
-  .auth-story-copy { margin-right: auto; margin-left: auto; }
+  .auth-story-badge { margin-left: 0; }
+  .auth-story-copy { margin-right: 0; margin-left: 0; }
   .auth-feature-list, .auth-story-footer { display: none; }
   .auth-card { padding: 25px; }
 }

@@ -20,7 +20,7 @@ option { color: #e8f0fb; background-color: #0d1b2e; }
 @keyframes boot-spin-reverse { to { transform: rotate(-360deg); } }
 @keyframes boot-pulse { 0%,100% { opacity: .42; transform: scale(.96); } 50% { opacity: 1; transform: scale(1); } }
 @keyframes boot-scan { 0% { transform: translateX(-130%); } 100% { transform: translateX(360%); } }
-@keyframes boot-secure-scan { 0%, 100% { opacity: .7; transform: scaleX(.92); filter: brightness(1); } 45% { opacity: 1; transform: scaleX(1); filter: brightness(1.25); } 70% { opacity: .84; transform: scaleX(.97); filter: brightness(1.05); } }
+@keyframes boot-secure-scan { 0%, 100% { opacity: .7; filter: brightness(1); } 45% { opacity: 1; filter: brightness(1.25); } 70% { opacity: .84; filter: brightness(1.05); } }
 @keyframes boot-bolt { 0%,100% { transform: scale(.9) rotate(-7deg); filter: drop-shadow(0 0 8px rgba(86,224,189,.35)); } 45% { transform: scale(1.08) rotate(4deg); filter: drop-shadow(0 0 24px rgba(86,224,189,.95)); } 52% { transform: scale(.98) rotate(-2deg); } }
 @keyframes boot-electric-ring { 0% { transform: scale(.72); opacity: .1; } 55% { opacity: .65; } 100% { transform: scale(1.45); opacity: 0; } }
 @keyframes boot-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }

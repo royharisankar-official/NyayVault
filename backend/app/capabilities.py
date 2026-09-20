@@ -155,7 +155,9 @@ def semantic_search(query: str, documents: list[dict]) -> list[dict]:
 
 def gemini_summary(text: str) -> str:
     if not settings.GEMINI_API_KEY:
-        return local_document_summary(text)
+        raise RuntimeError(
+            "Gemini is not configured on this deployment. Add GEMINI_API_KEY in the Render environment."
+        )
     document_text = text[:30000].strip()
     if not document_text:
         return "No readable text was extracted from this document. Open the original file and use OCR or a text-readable version before requesting a Gemini Summary."
@@ -174,7 +176,7 @@ def gemini_summary(text: str) -> str:
         )}]}]
     }).encode()
     request = urllib.request.Request(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?"
+        f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent?"
         + urllib.parse.urlencode({"key": settings.GEMINI_API_KEY}),
         data=payload,
         headers={"Content-Type": "application/json"},
@@ -189,7 +191,10 @@ def gemini_summary(text: str) -> str:
     except (urllib.error.URLError, TimeoutError) as error:
         raise RuntimeError(f"Gemini request failed: {error}") from error
     try:
-        return result["candidates"][0]["content"]["parts"][0]["text"].strip()
+        summary = result["candidates"][0]["content"]["parts"][0]["text"].strip()
+        if not summary:
+            raise RuntimeError("Gemini returned an empty summary")
+        return summary
     except (KeyError, IndexError, TypeError) as error:
         raise RuntimeError("Gemini returned an unexpected response") from error
 

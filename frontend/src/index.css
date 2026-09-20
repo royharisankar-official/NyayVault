@@ -36,6 +36,9 @@ option { color: #e8f0fb; background-color: #0d1b2e; }
 .document-row, .document-row * { min-width: 0; }
 .document-metadata { overflow-wrap: anywhere; }
 .document-actions button { overflow-wrap: anywhere; }
+.public-tab { border: 1px solid transparent; transition: background-color .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease; }
+.public-tab:not(.bg-mint):hover, .public-tab:not(.bg-mint):focus-visible { border-color: rgba(86,224,189,.24); background-color: rgba(86,224,189,.1); color: #e8f0fb; box-shadow: 0 4px 14px rgba(0,0,0,.12); }
+.light .public-tab:not(.bg-mint):hover, .light .public-tab:not(.bg-mint):focus-visible { border-color: rgba(22,143,120,.24); background-color: rgba(22,143,120,.1); color: #176f63; box-shadow: 0 4px 14px rgba(42,73,96,.12); }
 @media (max-width: 639px) {
   .document-actions button { flex: 1 1 calc(50% - 4px); }
 }

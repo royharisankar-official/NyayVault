@@ -227,6 +227,10 @@ option { color: #e8f0fb; background-color: #0d1b2e; }
   .auth-feature-list, .auth-story-footer { display: none; }
   .auth-card { padding: 25px; }
 }
+@media (max-width: 639px) {
+  .boot-orbit { width: min(140vw, 620px); }
+  .boot-orbit-two { width: min(112vw, 500px); }
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }

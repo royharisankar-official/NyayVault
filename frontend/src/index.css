@@ -5,7 +5,7 @@
 
 :root { font-family: "Space Grotesk", "Avenir Next", ui-sans-serif, system-ui, sans-serif; color: #e8f0fb; background: #07111f; }
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; background: radial-gradient(circle at 80% -10%, #173557 0, #07111f 42%); transition: background .5s ease, color .5s ease; }
+body { margin: 0; min-width: 320px; overflow-x: hidden; background: radial-gradient(circle at 80% -10%, #173557 0, #07111f 42%); transition: background .5s ease, color .5s ease; }
 button, input { font: inherit; }
 button { cursor: pointer; }
 select { color: #e8f0fb; background-color: #0d1b2e; }
@@ -55,7 +55,7 @@ option { color: #e8f0fb; background-color: #0d1b2e; }
 .auth-ambient { position: absolute; border-radius: 50%; filter: blur(2px); pointer-events: none; }
 .auth-ambient-one { width: 360px; height: 360px; top: -140px; left: -90px; background: rgba(86,224,189,.16); animation: auth-drift 9s ease-in-out infinite; }
 .auth-ambient-two { width: 300px; height: 300px; right: -80px; bottom: -100px; background: rgba(93,133,255,.15); animation: auth-drift 11s ease-in-out infinite reverse; }
-.auth-layout { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(280px, .9fr) minmax(320px, 430px); align-items: center; gap: clamp(34px, 7vw, 110px); width: min(1020px, 100%); }
+.auth-layout { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(280px, .9fr) minmax(320px, 430px); align-items: center; gap: clamp(34px, 7vw, 110px); min-width: 0; width: min(1020px, 100%); }
 .auth-story { animation: auth-card-in .7s ease-out both; }
 .auth-story-badge { display: inline-flex; align-items: center; gap: 9px; padding: 8px 12px; border: 1px solid rgba(86,224,189,.2); border-radius: 999px; color: #7fe6ca; font-family: "DM Mono", ui-monospace, monospace; font-size: 10px; letter-spacing: .15em; }
 .auth-live-dot { width: 7px; height: 7px; border-radius: 50%; background: #56e0bd; box-shadow: 0 0 12px #56e0bd; animation: boot-pulse 1.8s ease-in-out infinite; }
@@ -209,7 +209,7 @@ option { color: #e8f0fb; background-color: #0d1b2e; }
 .light .auth-form select { color: #17243a; border-color: rgba(42,73,96,.32); background-color: #fff; }
 .light .auth-form select:focus { border-color: rgba(22,143,120,.7); box-shadow: 0 0 0 3px rgba(22,143,120,.12); }
 @media (max-width: 760px) {
-  .auth-shell { padding: 20px; }
+  .auth-shell { padding: 20px; overflow-x: hidden; }
   .auth-layout { grid-template-columns: 1fr; gap: 24px; max-width: 480px; }
   .auth-story { text-align: center; }
   .auth-story-badge { margin: 0 auto; }

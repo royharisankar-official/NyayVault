@@ -50,7 +50,7 @@ option { color: #e8f0fb; background-color: #0d1b2e; }
   .document-content { gap: .75rem; }
   .document-actions { gap: .5rem; }
 }
-.auth-shell { position: fixed; inset: 0; z-index: 50; isolation: isolate; display: grid; place-items: center; min-height: 100dvh; overflow: auto; overscroll-behavior: contain; padding: 28px; color: #e8f0fb; background: radial-gradient(circle at 15% 20%, #173d56 0, #0a1a2b 38%, #050c16 100%); }
+.auth-shell { position: fixed; inset: 0; z-index: 50; isolation: isolate; display: grid; place-items: center; min-height: 100dvh; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding: 28px; color: #e8f0fb; background: radial-gradient(circle at 15% 20%, #173d56 0, #0a1a2b 38%, #050c16 100%); }
 .auth-grid { position: absolute; inset: 0; z-index: -1; opacity: .25; background-image: linear-gradient(rgba(86,224,189,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(86,224,189,.1) 1px, transparent 1px); background-size: 38px 38px; mask-image: linear-gradient(90deg, black, transparent 82%); }
 .auth-ambient { position: absolute; z-index: -1; border-radius: 50%; filter: blur(2px); pointer-events: none; }
 .auth-ambient-one { width: 360px; height: 360px; top: -140px; left: -90px; background: rgba(86,224,189,.16); animation: auth-drift 9s ease-in-out infinite; }

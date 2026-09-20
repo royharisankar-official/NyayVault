@@ -16,7 +16,7 @@ class Settings(BaseModel):
     )
     HF_TOKEN: str | None = os.getenv("HF_TOKEN")
     GEMINI_API_KEY: str | None = os.getenv("GEMINI_API_KEY")
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
     BASE_DIR: Path = BASE_DIR
 
     # File storage

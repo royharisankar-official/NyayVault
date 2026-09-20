@@ -42,7 +42,7 @@ app.post("/auth/register", async (req, res, next) => {
   try {
     const { email, password, role = "investigator" } = req.body;
     if (!email || !password || password.length < 8) return res.status(400).json({ detail: "Email and 8-character password required" });
-    if (!["admin", "police", "investigator", "court_officer"].includes(role)) return res.status(400).json({ detail: "Unsupported role" });
+    if (!["police", "investigator", "court_officer"].includes(role)) return res.status(400).json({ detail: "Unsupported role" });
     const passwordHash = await bcrypt.hash(password, 12);
     const user = await IntegrationUser.create({ email, passwordHash, role });
     return res.status(201).json({ id: user.id, email: user.email, role: user.role });

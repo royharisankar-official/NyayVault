@@ -512,6 +512,10 @@ ALLOWED_ROLES = {
     "admin", "police", "investigator", "forensic_officer",
     "prosecutor", "judicial_user", "court_officer", "citizen",
 }
+REGISTRATION_ROLES = ALLOWED_ROLES - {"admin"}
+REGISTRATION_DEPARTMENTS = {
+    "investigations", "police", "forensics", "prosecution", "court", "public",
+}
 SECURE_ROLE_CAPABILITIES = {
     "police": ["Assigned case access", "FIR and evidence upload", "Case collaboration", "Case AI"],
     "investigator": ["Investigation records", "Evidence management", "Timeline building", "Case AI"],
@@ -677,9 +681,11 @@ def register(request: RegisterRequest, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == email).first():
         raise HTTPException(status_code=409, detail="An account with this email already exists")
     role = request.role.strip().lower()
-    if role not in ALLOWED_ROLES:
+    if role not in REGISTRATION_ROLES:
         raise HTTPException(status_code=400, detail="Unsupported role")
     department = request.department.strip().lower() or "general"
+    if department not in REGISTRATION_DEPARTMENTS:
+        raise HTTPException(status_code=400, detail="Unsupported department")
     user = User(email=email, hashed_password=get_password_hash(request.password),
                 full_name=request.full_name.strip(), role=role, department=department)
     db.add(user)

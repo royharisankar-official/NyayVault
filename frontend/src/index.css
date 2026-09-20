@@ -211,7 +211,7 @@ option { color: #e8f0fb; background-color: #0d1b2e; }
 @media (max-width: 760px) {
   .auth-shell { padding: 20px; overflow-x: hidden; }
   .auth-layout { grid-template-columns: 1fr; gap: 24px; max-width: 480px; }
-  .auth-story { text-align: center; }
+  .auth-story { display: none; }
   .auth-story-badge { margin: 0 auto; }
   .auth-story h1 { font-size: clamp(38px, 11vw, 54px); }
   .auth-story-copy { margin-right: auto; margin-left: auto; }

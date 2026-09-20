@@ -42,6 +42,10 @@ option { color: #e8f0fb; background-color: #0d1b2e; }
 .public-audience-card { transition: background-color .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease; }
 .public-audience-card:not(.bg-electric):hover, .public-audience-card:not(.bg-electric):focus-visible { border-color: rgba(86,224,189,.38); background-color: rgba(86,224,189,.1); color: #e8f0fb; box-shadow: 0 5px 16px rgba(0,0,0,.14); transform: translateY(-1px); }
 .light .public-audience-card:not(.bg-electric):hover, .light .public-audience-card:not(.bg-electric):focus-visible { border-color: rgba(57,118,214,.38); background-color: rgba(57,118,214,.1); color: #285da8; box-shadow: 0 5px 16px rgba(42,73,96,.12); }
+.public-service-notice { border-color: rgba(245,190,70,.3); background: rgba(245,190,70,.1); color: #d9c28b; }
+.public-service-notice strong { color: #f4d276; }
+.light .public-service-notice { border-color: rgba(168,109,8,.3); background: rgba(168,109,8,.08); color: #5f4b20; }
+.light .public-service-notice strong { color: #8a5b00; }
 @media (max-width: 639px) {
   .document-actions button { flex: 1 1 calc(50% - 4px); }
 }

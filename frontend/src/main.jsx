@@ -1452,7 +1452,7 @@ function Auth({onDone,notify}) {
       <section className="auth-card">
         <div className="auth-card-top"><div className="auth-card-icon"><KeyRound size={19}/></div><div><div className="font-bold">Secure access</div><div className="text-xs text-slate-500">{PRODUCT_NAME} workspace</div></div><div className="auth-lock"><FileLock2 size={15}/></div></div>
         <div className="auth-card-kicker">{forgot ? "ACCOUNT RECOVERY" : register ? "NEW WORKSPACE IDENTITY" : "AUTHORIZED PERSONNEL ONLY"}</div>
-        <h2>{forgot ? (resetToken ? "Set a new password" : "Forgot your password?") : register ? "Create your account" : "Welcome back"}</h2>
+        <h2>{forgot ? (resetToken ? "Set a new password" : "Forgot your password?") : register ? "Create your account" : registrationNotice ? "Sign In" : "Welcome back"}</h2>
         <p className="auth-card-copy">{forgot ? (resetToken ? "Choose a new password for your workspace account." : "Enter your work email to generate a one-time reset token.") : register ? "Set up an authorized workspace identity." : "Sign in to continue to your protected evidence workspace."}</p>
         {registrationNotice && !register && !forgot && <div role="status" className="mt-4 rounded-xl border border-mint/25 bg-mint/10 px-3 py-3 text-xs leading-5 text-mint"><div className="font-bold">Registration successful</div><div className="mt-1 text-slate-400">{registrationNotice.replace("Registration successful. ", "")}</div></div>}
         {forgot && !resetToken && <form key="forgot-request" onSubmit={submitResetRequest} className="auth-form">

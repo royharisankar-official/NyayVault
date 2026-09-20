@@ -39,6 +39,9 @@ option { color: #e8f0fb; background-color: #0d1b2e; }
 .public-tab { border: 1px solid transparent; transition: background-color .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease; }
 .public-tab:not(.bg-mint):hover, .public-tab:not(.bg-mint):focus-visible { border-color: rgba(86,224,189,.24); background-color: rgba(86,224,189,.1); color: #e8f0fb; box-shadow: 0 4px 14px rgba(0,0,0,.12); }
 .light .public-tab:not(.bg-mint):hover, .light .public-tab:not(.bg-mint):focus-visible { border-color: rgba(22,143,120,.24); background-color: rgba(22,143,120,.1); color: #176f63; box-shadow: 0 4px 14px rgba(42,73,96,.12); }
+.public-audience-card { transition: background-color .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease; }
+.public-audience-card:not(.bg-electric):hover, .public-audience-card:not(.bg-electric):focus-visible { border-color: rgba(86,224,189,.38); background-color: rgba(86,224,189,.1); color: #e8f0fb; box-shadow: 0 5px 16px rgba(0,0,0,.14); transform: translateY(-1px); }
+.light .public-audience-card:not(.bg-electric):hover, .light .public-audience-card:not(.bg-electric):focus-visible { border-color: rgba(57,118,214,.38); background-color: rgba(57,118,214,.1); color: #285da8; box-shadow: 0 5px 16px rgba(42,73,96,.12); }
 @media (max-width: 639px) {
   .document-actions button { flex: 1 1 calc(50% - 4px); }
 }

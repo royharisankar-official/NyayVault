@@ -1358,6 +1358,7 @@ function Auth({onDone,notify}) {
   const [registeredEmail, setRegisteredEmail] = useState("");
   const [authError, setAuthError] = useState("");
   const [resetNotice, setResetNotice] = useState("");
+  const [registrationNotice, setRegistrationNotice] = useState("");
   const submitResetRequest = async (event) => {
     event.preventDefault();
     setLoading(true);
@@ -1419,6 +1420,7 @@ function Auth({onDone,notify}) {
         await request("/auth/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(values)});
         setRegisteredEmail(values.email);
         setRegister(false);
+        setRegistrationNotice("Registration successful. Your account is ready. Sign in below to continue.");
         notify("Account created. Please sign in with your new account.");
         return;
       }
@@ -1452,6 +1454,7 @@ function Auth({onDone,notify}) {
         <div className="auth-card-kicker">{forgot ? "ACCOUNT RECOVERY" : register ? "NEW WORKSPACE IDENTITY" : "AUTHORIZED PERSONNEL ONLY"}</div>
         <h2>{forgot ? (resetToken ? "Set a new password" : "Forgot your password?") : register ? "Create your account" : "Welcome back"}</h2>
         <p className="auth-card-copy">{forgot ? (resetToken ? "Choose a new password for your workspace account." : "Enter your work email to generate a one-time reset token.") : register ? "Set up an authorized workspace identity." : "Sign in to continue to your protected evidence workspace."}</p>
+        {registrationNotice && !register && !forgot && <div role="status" className="mt-4 rounded-xl border border-mint/25 bg-mint/10 px-3 py-3 text-xs leading-5 text-mint"><div className="font-bold">Registration successful</div><div className="mt-1 text-slate-400">{registrationNotice.replace("Registration successful. ", "")}</div></div>}
         {forgot && !resetToken && <form key="forgot-request" onSubmit={submitResetRequest} className="auth-form">
           <label>Work email<input name="email" required type="email" autoComplete="email" placeholder="name@organization.gov" /></label>
           <button type="submit" disabled={loading}>{loading ? "Generating…" : "Generate reset token"} <ArrowUpRight size={15}/></button>

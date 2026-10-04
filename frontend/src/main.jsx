@@ -783,11 +783,11 @@ function FeatureHub({kind, data, load, user, notify, theme, setTheme, onNavigate
         {kind === "settings" && <div className="mt-5 space-y-4">
           <div className="rounded-xl border border-white/10 bg-white/[.03] p-4">
             <div className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Account</div>
-            <dl className="grid gap-2 text-xs sm:grid-cols-2">
-              <div><dt className="text-slate-500">Name</dt><dd className="mt-1 font-semibold text-slate-200">{data?.profile?.full_name || user?.full_name || "Not available"}</dd></div>
-              <div><dt className="text-slate-500">Email</dt><dd className="mt-1 break-all font-semibold text-slate-200">{data?.profile?.email || "Not available"}</dd></div>
-              <div><dt className="text-slate-500">Role</dt><dd className="mt-1 font-semibold text-slate-200">{formatRoleLabel(data?.profile?.role || user?.role)}</dd></div>
-              <div><dt className="text-slate-500">Department</dt><dd className="mt-1 font-semibold text-slate-200">{data?.profile?.department || "Not available"}</dd></div>
+            <dl className="grid gap-x-4 gap-y-2 text-xs sm:grid-cols-2">
+              <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-baseline gap-2"><dt className="text-slate-500">Name</dt><dd className="min-w-0 break-words font-semibold text-slate-200">{data?.profile?.full_name || user?.full_name || "Not available"}</dd></div>
+              <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-baseline gap-2"><dt className="text-slate-500">Email</dt><dd className="min-w-0 break-all font-semibold text-slate-200">{data?.profile?.email || "Not available"}</dd></div>
+              <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-baseline gap-2"><dt className="text-slate-500">Role</dt><dd className="min-w-0 break-words font-semibold text-slate-200">{formatRoleLabel(data?.profile?.role || user?.role)}</dd></div>
+              <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-baseline gap-2"><dt className="text-slate-500">Department</dt><dd className="min-w-0 break-words font-semibold text-slate-200">{data?.profile?.department || "Not available"}</dd></div>
             </dl>
           </div>
           <div className="rounded-xl bg-white/[.03] p-4 text-xs text-slate-400">Current signed-in role: <span className="font-semibold text-mint">{user?.role || "unknown"}</span>. Use the controls below to manage workspace security services.</div>

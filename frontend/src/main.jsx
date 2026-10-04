@@ -45,6 +45,12 @@ function removeDemoRecordLabel(value) {
   return value;
 }
 
+function formatRoleLabel(role) {
+  return String(role || "unknown")
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, character => character.toUpperCase());
+}
+
 async function request(path, options = {}) {
   const headers = { ...(localStorage.getItem(tokenKey) ? { Authorization: `Bearer ${localStorage.getItem(tokenKey)}` } : {}), ...(options.headers || {}) };
   let response;
@@ -320,7 +326,7 @@ function App() {
       <div className="mx-auto flex max-w-[1500px] items-center justify-between px-4 py-3 sm:px-5 sm:py-4 lg:px-10">
         <div className="flex min-w-0 items-center gap-3"><div className="brand-mark shrink-0"><img src="/static/lexora-logo.png" alt="NyayVault logo" /></div><div className="min-w-0"><div className="font-black tracking-tight">Nyay<span className="text-mint">Vault</span></div><div className="hidden text-[10px] uppercase tracking-[.24em] text-slate-500 sm:block">Secure case intelligence</div></div></div>
         <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[.04] px-3 py-2 text-xs text-slate-400 lg:flex"><span className="h-2 w-2 animate-pulse rounded-full bg-green-400 shadow-[0_0_12px_#4ade80]"/> All systems operational</div>
-        <div className="flex shrink-0 items-center gap-2"><button aria-label="Toggle color theme" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="theme-toggle rounded-xl border border-white/10 p-2 text-slate-400 transition hover:border-mint/40 hover:text-mint">{theme === "dark" ? <Sun size={17}/> : <Moon size={17}/>}</button><button onClick={() => setMobileNav(!mobileNav)} className="rounded-lg border border-white/10 p-2 lg:hidden"><Menu size={18}/></button><div className="hidden text-right sm:block"><div className="text-sm font-semibold">{user?.full_name || "Secure workspace"}</div><div className="text-xs text-slate-500">{user?.role || "authentication required"}</div></div><button onClick={logout} className="rounded-xl border border-white/10 p-2 text-slate-400 transition hover:border-red-300/40 hover:text-red-300"><LogOut size={17}/></button></div>
+        <div className="flex shrink-0 items-center gap-2"><button aria-label="Toggle color theme" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="theme-toggle rounded-xl border border-white/10 p-2 text-slate-400 transition hover:border-mint/40 hover:text-mint">{theme === "dark" ? <Sun size={17}/> : <Moon size={17}/>}</button><button onClick={() => setMobileNav(!mobileNav)} className="rounded-lg border border-white/10 p-2 lg:hidden"><Menu size={18}/></button><div className="hidden text-right sm:block"><div className="text-sm font-semibold">{user?.full_name || "Secure workspace"}</div><div className="text-xs text-slate-500">{user ? formatRoleLabel(user.role) : "authentication required"}</div></div><button onClick={logout} className="rounded-xl border border-white/10 p-2 text-slate-400 transition hover:border-red-300/40 hover:text-red-300"><LogOut size={17}/></button></div>
       </div>
     </header>
     <div className="mx-auto flex max-w-[1500px]">
@@ -780,7 +786,7 @@ function FeatureHub({kind, data, load, user, notify, theme, setTheme, onNavigate
             <dl className="grid gap-2 text-xs sm:grid-cols-2">
               <div><dt className="text-slate-500">Name</dt><dd className="mt-1 font-semibold text-slate-200">{data?.profile?.full_name || user?.full_name || "Not available"}</dd></div>
               <div><dt className="text-slate-500">Email</dt><dd className="mt-1 break-all font-semibold text-slate-200">{data?.profile?.email || "Not available"}</dd></div>
-              <div><dt className="text-slate-500">Role</dt><dd className="mt-1 font-semibold text-slate-200">{(data?.profile?.role || user?.role || "unknown").replaceAll("_", " ")}</dd></div>
+              <div><dt className="text-slate-500">Role</dt><dd className="mt-1 font-semibold text-slate-200">{formatRoleLabel(data?.profile?.role || user?.role)}</dd></div>
               <div><dt className="text-slate-500">Department</dt><dd className="mt-1 font-semibold text-slate-200">{data?.profile?.department || "Not available"}</dd></div>
             </dl>
           </div>

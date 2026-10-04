@@ -24,9 +24,9 @@ API health check: [https://nyayvault.onrender.com/health](https://nyayvault.onre
 Interactive API documentation: [https://nyayvault.onrender.com/docs](https://nyayvault.onrender.com/docs)
 
 > This is a demonstration deployment. Do not upload real confidential legal
-> records. The Render service uses a persistent disk for the SQLite database,
-> so registered users survive normal redeployments. Uploaded files remain
-> subject to the configured storage and backup setup.
+> records. Account and case persistence depends on configuring `DATABASE_URL`
+> to a durable database. Uploaded files remain subject to the configured
+> storage and backup setup.
 
 ## Recommended way to run on Windows
 
@@ -89,14 +89,18 @@ Then browse to `http://127.0.0.1:8000`. Stop it with `Ctrl+C`, or run
 ## Deploy on Render
 
 This repository includes a `render.yaml` Blueprint and a production Dockerfile.
-In Render, choose **New > Blueprint**, connect the GitHub repository, and apply
-the Blueprint. The image builds the Vite frontend inside Docker, so a local
-`frontend\dist` folder is not required in Git. The service listens on Render's
-`PORT` environment variable and uses `/health` for health checks.
+The image builds the Vite frontend inside Docker, so a local `frontend\dist`
+folder is not required in Git. The service listens on Render's `PORT`
+environment variable and uses `/health` for health checks.
 
-The SQLite database is mounted on a Render persistent disk by `render.yaml`, so
-user accounts and application records survive normal service replacements.
-Configure external database and object storage services before production use.
+For a Render Free web service, configure `DATABASE_URL` in the service's
+Environment settings to point to a durable external PostgreSQL database. The
+application accepts standard `postgresql://` connection URLs. The SQLite
+fallback is intended for local development and is not durable on an ephemeral
+service filesystem. A Free web service can also spin down while idle, so its
+first request after inactivity may take time to start. Uploaded files still
+need persistent-disk or object-storage configuration; PostgreSQL only
+preserves database records.
 
 This is a demonstration prototype. Replace default secrets and review data
 protection before using it with real confidential documents.

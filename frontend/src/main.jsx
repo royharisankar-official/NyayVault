@@ -31,7 +31,6 @@ const nav = [
   { id: "intelligence", label: "Ask NyAI", icon: BrainCircuit },
   { id: "audit", label: "Audit & Integrity", icon: Fingerprint },
   { id: "settings", label: "Settings", icon: Settings },
-  { id: "public", label: "Public Services", icon: Globe2 },
   { id: "admin", label: "Admin Panel", icon: ShieldAlert },
 ];
 

@@ -10,7 +10,13 @@ FROM python:3.12-slim
 
 WORKDIR /app
 COPY backend/requirements.txt ./backend/requirements.txt
-RUN pip install --no-cache-dir -r backend/requirements.txt
+COPY backend/requirements-optional.txt ./backend/requirements-optional.txt
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tesseract-ocr libgomp1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir -r backend/requirements.txt \
+    && pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch \
+    && pip install --no-cache-dir -r backend/requirements-optional.txt
 COPY backend ./backend
 COPY --from=frontend-build /frontend/dist ./frontend/dist
 

@@ -1,12 +1,15 @@
-"""Optional production-oriented capabilities used by the prototype.
+"""Production-oriented capabilities used by the prototype.
 
-Heavy ML/OCR runtimes are intentionally optional. The API reports unavailable
-capabilities instead of silently claiming that a feature ran.
+OCR and embedding runtimes are optional for local development. The production
+Docker image installs them, and the API reports unavailable capabilities
+instead of silently claiming that a feature ran.
 """
 
 import base64
+from functools import lru_cache
 import hashlib
 import hmac
+import importlib.util
 import io
 import json
 import os
@@ -138,8 +141,8 @@ def semantic_search(query: str, documents: list[dict]) -> list[dict]:
     machine without hiding that embeddings are unavailable.
     """
     try:
-        from sentence_transformers import SentenceTransformer, util
-        model = SentenceTransformer("all-MiniLM-L6-v2")
+        from sentence_transformers import util
+        model = _sentence_transformer_model()
         texts = [d.get("text", "") for d in documents]
         scores = util.cos_sim(model.encode(query), model.encode(texts))[0].tolist()
         return sorted(({**d, "score": float(score)} for d, score in zip(documents, scores)),
@@ -151,6 +154,12 @@ def semantic_search(query: str, documents: list[dict]) -> list[dict]:
             words = set(document.get("text", "").lower().split())
             ranked.append({**document, "score": len(terms & words) / max(len(terms), 1)})
         return sorted(ranked, key=lambda item: item["score"], reverse=True)
+
+
+@lru_cache(maxsize=1)
+def _sentence_transformer_model():
+    from sentence_transformers import SentenceTransformer
+    return SentenceTransformer("all-MiniLM-L6-v2")
 
 
 def gemini_summary(text: str) -> str:
@@ -326,7 +335,11 @@ def capabilities() -> dict:
         "aes_gcm": CRYPTO_AVAILABLE,
         "ed25519_signatures": CRYPTO_AVAILABLE,
         "totp_mfa": True,
-        "tesseract_ocr": _has_module("pytesseract"),
+        "tesseract_ocr": (
+            _has_module("pytesseract")
+            and _has_module("PIL")
+            and _tesseract_available()
+        ),
         "sentence_transformers": _has_module("sentence_transformers"),
         "rag_retrieval": True,
         "permissioned_chain_anchor": True,
@@ -336,7 +349,10 @@ def capabilities() -> dict:
 
 def _has_module(name: str) -> bool:
     try:
-        __import__(name)
-        return True
-    except ImportError:
+        return importlib.util.find_spec(name) is not None
+    except (ImportError, ModuleNotFoundError, ValueError):
         return False
+
+
+def _tesseract_available() -> bool:
+    return bool(shutil.which("tesseract") or Path("C:/Program Files/Tesseract-OCR/tesseract.exe").is_file())

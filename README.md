@@ -102,5 +102,9 @@ first request after inactivity may take time to start. Uploaded files still
 need persistent-disk or object-storage configuration; PostgreSQL only
 preserves database records.
 
+The production Docker image installs Tesseract OCR and the optional Python
+OCR and sentence-transformer dependencies. The embedding model is downloaded
+on the first semantic search and then reused for the lifetime of the process.
+
 This is a demonstration prototype. Replace default secrets and review data
 protection before using it with real confidential documents.

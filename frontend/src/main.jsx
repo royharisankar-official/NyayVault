@@ -148,6 +148,7 @@ async function downloadDocument(doc) {
 }
 
 function App() {
+  const [booting, setBooting] = useState(true);
   const [user, setUser] = useState(null);
   const [view, setView] = useState("overview");
   const [data, setData] = useState({ total_documents: 0, active_cases: 0, integrity: 100, activities: [], by_type: {} });
@@ -183,6 +184,10 @@ function App() {
     document.documentElement.classList.toggle("light", theme === "light");
     localStorage.setItem("dms_theme", theme);
   }, [theme]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setBooting(false), 5000);
+    return () => window.clearTimeout(timer);
+  }, []);
   const notify = (message) => { setToast(message); setTimeout(() => setToast(""), 3400); };
   const refresh = async () => {
     try {
@@ -304,6 +309,7 @@ function App() {
     } catch (error) { notify(error.message); }
   };
 
+  if (booting) return <LoadingScreen />;
   return <div className="min-h-screen overflow-x-hidden">
     <div className="fixed inset-0 pointer-events-none grid-noise opacity-30" />
     <header className="sticky top-0 z-30 border-b border-white/10 bg-ink/85 backdrop-blur-xl">

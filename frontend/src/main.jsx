@@ -300,14 +300,18 @@ function App() {
         const resources = await request(`/public/legal-resources?refresh=${Date.now()}`);
         setFeatureData(current => ({...current, public: resources}));
         notify("Public services refreshed");
-        return;
+        return true;
       }
       const path = kind === "cases" ? "/secure/overview" : kind === "collaboration" ? "/notifications" : kind === "admin" ? "/admin/overview" : "/capabilities";
       const payload = kind === "settings"
         ? {capabilities: await request("/capabilities"), storage: await request("/integrations/cloud"), profile: await request("/auth/me")}
         : await request(path);
       setFeatureData(current => ({...current, [kind]: payload}));
-    } catch (error) { notify(error.message); }
+      return true;
+    } catch (error) {
+      notify(error.message);
+      return false;
+    }
   };
 
   if (booting) return <LoadingScreen />;
@@ -590,6 +594,9 @@ function FeatureHub({kind, data, load, user, notify}) {
   const [mfaCode, setMfaCode] = useState("");
   const [mfaEnabled, setMfaEnabled] = useState(Boolean(user?.mfa_enabled || data?.profile?.mfa_enabled));
   const [mfaFeedback, setMfaFeedback] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshFeedback, setRefreshFeedback] = useState("");
+  const [refreshedAt, setRefreshedAt] = useState(null);
   const [audience, setAudience] = useState("citizen");
   const [publicMode, setPublicMode] = useState("question");
   const [trackCode, setTrackCode] = useState("");
@@ -669,7 +676,21 @@ function FeatureHub({kind, data, load, user, notify}) {
     try { setResult(await request("/backups", {method: "POST"})); notify("Backup created successfully"); }
     catch (error) { notify(error.message); }
   };
-  return <><PageTitle eyebrow={config[0]} title={config[1]} subtitle={config[2]} action={<button onClick={load} className="rounded-xl border border-mint/25 px-4 py-2.5 text-sm font-semibold text-mint">Refresh</button>}/>
+  const refreshFeature = async () => {
+    setRefreshing(true);
+    setRefreshFeedback("");
+    try {
+      const refreshed = await load();
+      if (refreshed === false) {
+        setRefreshFeedback("Refresh failed. Check the error notification and try again.");
+        return;
+      }
+      setRefreshedAt(new Date());
+    } finally {
+      setRefreshing(false);
+    }
+  };
+  return <><PageTitle eyebrow={config[0]} title={config[1]} subtitle={config[2]} action={<div className="flex flex-col items-start gap-2 sm:items-end"><button onClick={refreshFeature} disabled={refreshing} className="rounded-xl border border-mint/25 px-4 py-2.5 text-sm font-semibold text-mint disabled:cursor-wait disabled:opacity-50">{refreshing ? "Refreshing..." : "Refresh"}</button>{refreshedAt && <span className="text-[10px] text-slate-500">Updated {refreshedAt.toLocaleTimeString()}</span>}{refreshFeedback && <span role="alert" className="text-[11px] text-amber-300">{refreshFeedback}</span>}</div>}/>
     <div className="grid gap-5 lg:grid-cols-[1.25fr_.75fr]">
       <section className="rounded-2xl border border-white/10 bg-panel/70 p-6">
         <div className="mb-5 flex items-center gap-3"><div className="rounded-xl bg-mint/10 p-3 text-mint">{kind === "public" ? <Globe2 size={20}/> : kind === "admin" ? <ShieldAlert size={20}/> : <BriefcaseBusiness size={20}/>}</div><div><h2 className="font-bold">{config[1]}</h2><p className="text-xs text-slate-500">Workspace controls are connected to the secure API.</p></div></div>

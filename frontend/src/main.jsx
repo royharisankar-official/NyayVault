@@ -218,7 +218,7 @@ function App() {
   useEffect(() => {
     const documentElementOverflow = document.documentElement.style.overflow;
     const bodyOverflow = document.body.style.overflow;
-    const modalOpen = showAuth || showUpload || showCreateCase;
+    const modalOpen = showAuth || showUpload || showCreateCase || mobileNav;
     if (modalOpen) {
       document.documentElement.style.overflow = "hidden";
       document.body.style.overflow = "hidden";
@@ -227,7 +227,7 @@ function App() {
       document.documentElement.style.overflow = documentElementOverflow;
       document.body.style.overflow = bodyOverflow;
     };
-  }, [showAuth, showUpload, showCreateCase]);
+  }, [showAuth, showUpload, showCreateCase, mobileNav]);
   useEffect(() => {
     if (view === "overview" && localStorage.getItem(tokenKey)) refresh();
   }, [view]);
@@ -326,10 +326,11 @@ function App() {
       <div className="mx-auto flex max-w-[1500px] items-center justify-between px-4 py-3 sm:px-5 sm:py-4 lg:px-10">
         <div className="flex min-w-0 items-center gap-3"><div className="brand-mark shrink-0"><img src="/static/lexora-logo.png" alt="NyayVault logo" /></div><div className="min-w-0"><div className="font-black tracking-tight">Nyay<span className="text-mint">Vault</span></div><div className="hidden text-[10px] uppercase tracking-[.24em] text-slate-500 sm:block">Secure case intelligence</div></div></div>
         <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[.04] px-3 py-2 text-xs text-slate-400 lg:flex"><span className="h-2 w-2 animate-pulse rounded-full bg-green-400 shadow-[0_0_12px_#4ade80]"/> All systems operational</div>
-        <div className="flex shrink-0 items-center gap-2"><button aria-label="Toggle color theme" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="theme-toggle rounded-xl border border-white/10 p-2 text-slate-400 transition hover:border-mint/40 hover:text-mint">{theme === "dark" ? <Sun size={17}/> : <Moon size={17}/>}</button><button onClick={() => setMobileNav(!mobileNav)} className="rounded-lg border border-white/10 p-2 lg:hidden"><Menu size={18}/></button><div className="hidden text-right sm:block"><div className="text-sm font-semibold">{user?.full_name || "Secure workspace"}</div><div className="text-xs text-slate-500">{user ? formatRoleLabel(user.role) : "authentication required"}</div></div><button onClick={logout} className="rounded-xl border border-white/10 p-2 text-slate-400 transition hover:border-red-300/40 hover:text-red-300"><LogOut size={17}/></button></div>
+        <div className="flex shrink-0 items-center gap-2"><button aria-label="Toggle color theme" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="theme-toggle rounded-xl border border-white/10 p-2 text-slate-400 transition hover:border-mint/40 hover:text-mint">{theme === "dark" ? <Sun size={17}/> : <Moon size={17}/>}</button><button aria-label={mobileNav ? "Close workspace menu" : "Open workspace menu"} aria-expanded={mobileNav} onClick={() => setMobileNav(!mobileNav)} className="rounded-lg border border-white/10 p-2 lg:hidden"><Menu size={18}/></button><div className="hidden text-right sm:block"><div className="text-sm font-semibold">{user?.full_name || "Secure workspace"}</div><div className="text-xs text-slate-500">{user ? formatRoleLabel(user.role) : "authentication required"}</div></div><button onClick={logout} className="rounded-xl border border-white/10 p-2 text-slate-400 transition hover:border-red-300/40 hover:text-red-300"><LogOut size={17}/></button></div>
       </div>
     </header>
     <div className="mx-auto flex max-w-[1500px]">
+      {mobileNav && <button type="button" aria-label="Close workspace menu" onClick={() => setMobileNav(false)} className="fixed inset-x-0 bottom-0 top-16 z-10 bg-black/45 lg:hidden"/>}
       <aside className={`${mobileNav ? "fixed inset-x-4 top-20 z-20 flex" : "hidden"} h-[calc(100dvh-6rem)] w-64 shrink-0 flex-col gap-4 lg:sticky lg:top-24 lg:flex lg:h-[calc(100dvh-7rem)] lg:self-start`}>
         <section aria-label="Workspace navigation" className="workspace-navigation-card min-h-0 flex-1 overflow-y-auto rounded-2xl border border-white/10 bg-panel p-3 shadow-2xl">
           <div className="mb-7 px-3 pt-3 text-[10px] font-bold uppercase tracking-[.22em] text-slate-500">Workspace</div>

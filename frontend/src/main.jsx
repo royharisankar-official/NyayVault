@@ -622,11 +622,7 @@ function FeatureHub({kind, data, load, user, notify, theme, setTheme, onNavigate
       ["CASE-2026-0138", "Evidence chain review", "Court filing", "Medium"],
       ["CASE-2026-0119", "Digital fraud complaint", "Charge sheet", "High"],
     ]},
-    collaboration: {stats: [["Team members", "24", "Across 6 departments"], ["Pending approvals", "07", "2 due today"], ["Unread alerts", "03", "Requires review"]], rows: [
-      ["Forensic Lab", "DNA report v3", "Awaiting approval", "Today"],
-      ["Prosecution", "Charge sheet draft", "Shared securely", "Yesterday"],
-      ["Court Registry", "Filing bundle", "Access granted", "2 days ago"],
-    ]},
+    collaboration: {stats: [], rows: []},
     public: {stats: [["Legal resources", "48", "Verified public guides"], ["Complaint drafts", "16", "Current workspace"], ["Case lookups", "31", "No private data exposed"]], rows: [
       ["Ask", "General legal guidance", "Available", "Public tier"],
       ["Complaint drafting", "Editable guided template", "Available", "Public tier"],
@@ -644,6 +640,10 @@ function FeatureHub({kind, data, load, user, notify, theme, setTheme, onNavigate
     ]},
   }[kind];
   const display = kind === "public" ? workspaceSummary : data || workspaceSummary;
+  const [notifications, setNotifications] = useState(Array.isArray(data) ? data : []);
+  useEffect(() => {
+    if (kind === "collaboration") setNotifications(Array.isArray(data) ? data : []);
+  }, [kind, data]);
   const action = async (path, body) => {
     try { setResult(await request(path, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)})); }
     catch (error) { notify(error.message); }
@@ -721,6 +721,17 @@ function FeatureHub({kind, data, load, user, notify, theme, setTheme, onNavigate
       setRefreshing(false);
     }
   };
+  const markNotificationRead = async (notificationId) => {
+    try {
+      await request(`/notifications/${notificationId}/read`, {method: "POST"});
+      setNotifications(current => current.map(item => (
+        item.id === notificationId ? {...item, status: "read"} : item
+      )));
+      notify("Notification marked as read");
+    } catch (error) {
+      notify(`Unable to update notification: ${error.message}`);
+    }
+  };
   return <><PageTitle eyebrow={config[0]} title={config[1]} subtitle={config[2]} action={<div className="flex flex-col items-start gap-2 sm:items-end"><button onClick={refreshFeature} disabled={refreshing} className="rounded-xl border border-mint/25 px-4 py-2.5 text-sm font-semibold text-mint disabled:cursor-wait disabled:opacity-50">{refreshing ? "Refreshing..." : "Refresh"}</button>{refreshedAt && <span className="text-[10px] text-slate-500">Updated {refreshedAt.toLocaleTimeString()}</span>}{refreshFeedback && <span role="alert" className="text-[11px] text-amber-300">{refreshFeedback}</span>}</div>}/>
     <div className="grid gap-5 lg:grid-cols-[1.25fr_.75fr]">
       <section className="rounded-2xl border border-white/10 bg-panel/70 p-6">
@@ -737,12 +748,28 @@ function FeatureHub({kind, data, load, user, notify, theme, setTheme, onNavigate
           <div className="rounded-xl border border-white/10 bg-white/[.03] p-4"><div className="mb-2 text-xs uppercase tracking-wider text-slate-500">Capabilities</div><div className="space-y-1 text-xs text-slate-300">{Object.entries(data.capabilities || {}).map(([key, value]) => <div key={key} className="flex justify-between gap-3"><span>{key.replaceAll("_", " ")}</span><span className={value ? "text-mint" : "text-amber-300"}>{value ? "Ready" : "Not configured"}</span></div>)}</div></div>
           <div className="rounded-xl border border-white/10 bg-white/[.03] p-4"><div className="mb-2 text-xs uppercase tracking-wider text-slate-500">Storage</div><div className="text-sm font-semibold text-slate-200">{data.storage?.active_provider || "local"}</div><div className="mt-1 text-xs text-slate-400">{data.storage?.message}</div><div className="mt-3 text-xs text-slate-500">{data.profile?.email}</div></div>
         </div>}
-        {data && kind !== "settings" && <details className="mt-5 rounded-xl border border-white/10 bg-white/[.03] p-4"><summary className="cursor-pointer text-xs text-slate-400">View connected API payload</summary><pre className="mt-3 max-h-64 overflow-auto text-xs leading-6 text-slate-300">{JSON.stringify(data, null, 2)}</pre></details>}
+        {kind === "collaboration" && <div className="mt-5 rounded-xl border border-white/10 bg-white/[.03] p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div><h3 className="font-bold">Your notifications</h3><p className="mt-1 text-xs text-slate-500">Recent in-app updates for your account.</p></div>
+            <span className="rounded-full bg-electric/10 px-2.5 py-1 text-[10px] text-electric">{notifications.filter(item => item.status !== "read").length} unread</span>
+          </div>
+          {notifications.length ? <div className="space-y-2">
+            {notifications.map(item => <article key={item.id} className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-white/5 bg-white/[.02] p-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2"><h4 className="text-sm font-semibold text-slate-200">{item.title}</h4><span className={`rounded-full px-2 py-0.5 text-[10px] uppercase ${item.status === "read" ? "bg-white/5 text-slate-500" : "bg-mint/10 text-mint"}`}>{item.status || "unread"}</span></div>
+                <p className="mt-1 whitespace-pre-wrap break-words text-xs leading-5 text-slate-400">{item.message}</p>
+                {item.created_at && <time className="mt-2 block text-[10px] text-slate-500">{formatExactDateTime(item.created_at)}</time>}
+              </div>
+              {item.status !== "read" && <button type="button" onClick={() => markNotificationRead(item.id)} className="shrink-0 rounded-lg border border-electric/25 px-3 py-1.5 text-xs font-semibold text-electric">Mark as read</button>}
+            </article>)}
+          </div> : <div className="rounded-lg border border-dashed border-white/10 px-4 py-8 text-center text-xs text-slate-500">{data === undefined ? "Loading notifications…" : "You have no notifications yet."}</div>}
+        </div>}
+        {data && kind !== "settings" && kind !== "collaboration" && <details className="mt-5 rounded-xl border border-white/10 bg-white/[.03] p-4"><summary className="cursor-pointer text-xs text-slate-400">View connected API payload</summary><pre className="mt-3 max-h-64 overflow-auto text-xs leading-6 text-slate-300">{JSON.stringify(data, null, 2)}</pre></details>}
         {result && <div className="mt-4 rounded-xl border border-mint/20 bg-mint/5 p-4 text-xs text-slate-300"><pre className="whitespace-pre-wrap">{JSON.stringify(result, null, 2)}</pre></div>}
       </section>
       <section className="rounded-2xl border border-white/10 bg-panel/70 p-6">
-        <h3 className="font-bold">{kind === "settings" ? "Security & preferences" : "Quick action"}</h3>
-        <p className="mt-1 text-xs leading-5 text-slate-500">{kind === "settings" ? "Manage your sign-in security and personal workspace preferences." : "Use the same controlled API surfaces used by the workspace."}</p>
+        <h3 className="font-bold">{kind === "settings" ? "Security & preferences" : kind === "collaboration" ? "Notification center" : "Quick action"}</h3>
+        <p className="mt-1 text-xs leading-5 text-slate-500">{kind === "settings" ? "Manage your sign-in security and personal workspace preferences." : kind === "collaboration" ? "Only notifications addressed to your signed-in account are shown here." : "Use the same controlled API surfaces used by the workspace."}</p>
         {kind === "public" && <><div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-5">{[["question", "Ask question"], ["complaint", "File complaint"], ["document", "Personal document"], ["track", "Track status"], ["resources", "Law library"]].map(([id, label]) => <button key={id} onClick={() => {setPublicMode(id); setResult(null);}} className={`rounded-lg border px-3 py-2 text-xs ${publicMode === id ? "border-electric bg-electric/10 text-electric" : "border-white/10 text-slate-400"}`}>{label}</button>)}</div>        {publicMode !== "track" && publicMode !== "resources" && <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">{[["citizen", "Citizen"], ["student", "Student"], ["lawyer", "Lawyer"], ["victim", "Victim / complainant"]].map(([id, label]) => <button key={id} onClick={() => setAudience(id)} className={`rounded-lg border px-3 py-2 text-xs ${audience === id ? "border-electric bg-electric/10 text-electric" : "border-white/10 text-slate-400"}`}>{label}</button>)}</div>}{publicMode === "question" && <><textarea value={input} onChange={event => setInput(event.target.value)} placeholder="Ask a general legal question. Try: What records should I preserve after an incident?" className="mt-4 min-h-28 w-full rounded-xl border border-white/10 bg-white/[.03] p-3 text-sm outline-none"/><div className="mt-3 flex flex-wrap gap-2"><button onClick={() => action("/public/legal-question", {question: input || "Explain my legal options", audience})} className="rounded-lg bg-electric px-3 py-2 text-xs font-bold text-ink">Ask NyAI</button><button onClick={() => action("/public/assistance", {question: input || "Guide me", audience})} className="rounded-lg border border-electric/25 px-3 py-2 text-xs text-electric">Plain-language guide</button></div></>}{publicMode === "complaint" && <><textarea value={input} onChange={event => setInput(event.target.value)} placeholder="Describe what happened, when, where and who was involved. Do not include confidential investigation records." className="mt-4 min-h-32 w-full rounded-xl border border-white/10 bg-white/[.03] p-3 text-sm outline-none"/><button onClick={() => action("/public/complaint-draft", {facts: input || "My complaint facts", language: "English"})} className="mt-3 rounded-lg bg-mint px-3 py-2 text-xs font-bold text-ink">Create editable complaint</button></>}{publicMode === "document" && <><input ref={publicFileInput} type="file" hidden accept=".pdf,.jpg,.jpeg,.png,.txt,.doc,.docx" onChange={event => setPublicFile(event.target.files[0])}/><button onClick={() => publicFileInput.current.click()} className="mt-4 w-full rounded-xl border border-dashed border-mint/30 bg-mint/[.04] p-8 text-sm text-slate-300"><UploadCloud size={24} className="mx-auto mb-2 text-mint"/>{publicFile ? publicFile.name : "Choose a personal document for in-memory review"}</button><button disabled={!publicFile} onClick={async () => {const form = new FormData(); form.append("document", publicFile); try {setResult(await request("/public/personal-document/upload", {method:"POST", body:form}));} catch(error) {notify(error.message);}}} className="mt-3 rounded-lg border border-mint/25 px-3 py-2 text-xs font-semibold text-mint disabled:opacity-40">Review document securely</button><p className="mt-2 text-[11px] text-slate-500">Public uploads are not stored in the secure case repository.</p></>}{publicMode === "track" && <><input value={trackCase} onChange={event => setTrackCase(event.target.value)} placeholder="Case ID / case number" className="mt-4 w-full rounded-xl border border-white/10 bg-white/[.03] p-3 text-sm"/><input value={trackCode} onChange={event => setTrackCode(event.target.value)} placeholder="Verification code supplied by the agency" className="mt-2 w-full rounded-xl border border-white/10 bg-white/[.03] p-3 text-sm"/><button onClick={() => action("/public/case-track", {case_number: trackCase || "CASE-2026-0142", verification_code: trackCode})} className="mt-3 rounded-lg bg-electric px-3 py-2 text-xs font-bold text-ink">View public status</button><p className="mt-2 text-[11px] text-slate-500">Only an agency-published status snapshot is queried; confidential documents remain private.</p></>}{publicMode === "resources" && <button onClick={async () => {try {setResult(await request("/public/legal-resources"));} catch(error) {notify(error.message);}}} className="mt-4 rounded-lg bg-electric px-3 py-2 text-xs font-bold text-ink">Open public law library</button>}{result && <div className="mt-5 rounded-xl border border-mint/20 bg-mint/5 p-4"><div className="mb-2 text-xs font-bold uppercase tracking-widest text-mint">Public result</div><pre className="max-h-80 overflow-auto whitespace-pre-wrap text-xs leading-6 text-slate-300">{JSON.stringify(result, null, 2)}</pre></div>}</>}
         {kind === "cases" && <p className="mt-5 rounded-xl bg-white/[.03] p-4 text-xs text-slate-400">Case creation remains available through the secure API and existing upload workflow. Case-specific timelines and collaborators are retained with every case.</p>}
         {kind === "collaboration" && <p className="mt-5 rounded-xl bg-white/[.03] p-4 text-xs text-slate-400">Notifications, permissions, controlled sharing and collaborator records are audited for accountability.</p>}

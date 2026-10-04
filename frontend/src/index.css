@@ -191,6 +191,9 @@ option { color: #e8f0fb; background-color: #0d1b2e; }
 .light .text-mint { color: #168f78; }
 .light .text-electric { color: #3976d6; }
 .light .text-amber-300 { color: #a86d08; }
+.light .mfa-setup-notice { border-color: rgba(168,109,8,.26); background: rgba(168,109,8,.07); color: #34445d; }
+.light .mfa-setup-secret { background: rgba(35,73,97,.07); color: #176f63; }
+.light .mfa-feedback-error { background: rgba(168,109,8,.08); color: #744b0c; }
 .light .bg-gradient-to-br { background-image: linear-gradient(135deg, rgba(255,255,255,.98), rgba(224,242,244,.94)); }
 .light .from-\[\#153454\] { --tw-gradient-from: #ffffff var(--tw-gradient-from-position); --tw-gradient-to: rgba(255,255,255,0) var(--tw-gradient-to-position); }
 .light .to-panel { --tw-gradient-to: #e0f2f4 var(--tw-gradient-to-position); }

@@ -727,9 +727,9 @@ function FeatureHub({kind, data, load, user, notify}) {
               {user?.role === "admin" && <button onClick={createBackup} className="rounded-lg border border-mint/25 px-3 py-2 text-xs font-semibold text-mint hover:bg-mint/10">Create encrypted backup</button>}
             </div>
             {mfaSetup && !mfaEnabled && <div className="mt-4 space-y-3">
-              <div className="rounded-lg border border-amber-300/20 bg-amber-300/5 p-3 text-xs leading-5 text-amber-100">
+              <div className="mfa-setup-notice rounded-lg border border-amber-300/20 bg-amber-300/5 p-3 text-xs leading-5 text-amber-100">
                 Add this secret to your authenticator app using its manual setup option, then enter the current six-digit code below. Keep the secret private and do not share it.
-                <div className="mt-2 break-all rounded bg-black/20 p-2 font-mono text-amber-200">{mfaSetup.secret}</div>
+                <div className="mfa-setup-secret mt-2 break-all rounded bg-black/20 p-2 font-mono text-amber-200">{mfaSetup.secret}</div>
               </div>
               <form onSubmit={verifyMfa} className="flex flex-wrap items-end gap-2">
                 <label className="min-w-48 flex-1 text-xs text-slate-400">Authenticator code
@@ -738,7 +738,7 @@ function FeatureHub({kind, data, load, user, notify}) {
                 <button type="submit" disabled={mfaCode.length !== 6} className="rounded-lg bg-mint px-3 py-2.5 text-xs font-bold text-ink disabled:cursor-not-allowed disabled:opacity-40">Verify and enable</button>
               </form>
             </div>}
-            {mfaFeedback && <div role={mfaEnabled ? "status" : "alert"} className={`mt-3 rounded-lg p-3 text-xs leading-5 ${mfaEnabled ? "bg-mint/10 text-mint" : "bg-amber-300/10 text-amber-200"}`}>{mfaFeedback}</div>}
+            {mfaFeedback && <div role={mfaEnabled ? "status" : "alert"} className={`mfa-feedback mt-3 rounded-lg p-3 text-xs leading-5 ${mfaEnabled ? "bg-mint/10 text-mint" : "mfa-feedback-error bg-amber-300/10 text-amber-200"}`}>{mfaFeedback}</div>}
             <p className="mt-3 text-[11px] leading-5 text-slate-500">After enabling, enter the code from your authenticator app when signing in. NyayVault never needs you to send that code in chat.</p>
           </div>
         </div>}

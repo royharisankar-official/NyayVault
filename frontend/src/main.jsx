@@ -14,14 +14,14 @@ import "./index.css";
 const API = "/api";
 const PRODUCT_NAME = "NyayVault";
 const tokenKey = "dms_token";
-const themeDefaultVersion = "light-default-v2";
+const themeDefaultVersion = "dark-default-v3";
 const launchTheme = new URLSearchParams(window.location.search).get("theme");
 const storedThemeVersion = localStorage.getItem("dms_theme_default");
 const initialTheme = launchTheme === "light" || launchTheme === "dark"
   ? launchTheme
   : storedThemeVersion === themeDefaultVersion
-    ? localStorage.getItem("dms_theme") || "light"
-    : "light";
+    ? localStorage.getItem("dms_theme") || "dark"
+    : "dark";
 document.documentElement.classList.toggle("light", initialTheme === "light");
 const nav = [
   { id: "overview", label: "Dashboard", icon: Gauge },
@@ -173,11 +173,11 @@ function App() {
   const [theme, setTheme] = useState(() => {
     if (launchTheme === "light" || launchTheme === "dark") return launchTheme;
     if (localStorage.getItem("dms_theme_default") !== themeDefaultVersion) {
-      localStorage.setItem("dms_theme", "light");
+      localStorage.setItem("dms_theme", "dark");
       localStorage.setItem("dms_theme_default", themeDefaultVersion);
-      return "light";
+      return "dark";
     }
-    return localStorage.getItem("dms_theme") || "light";
+    return localStorage.getItem("dms_theme") || "dark";
   });
   const [searchLoading, setSearchLoading] = useState(false);
   const [documentType, setDocumentType] = useState("");

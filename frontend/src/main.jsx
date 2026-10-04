@@ -585,12 +585,19 @@ function CaseWorkspace({notify}) {
 function FeatureHub({kind, data, load, user, notify}) {
   const [input, setInput] = useState("");
   const [result, setResult] = useState(null);
+  const [mfaSetup, setMfaSetup] = useState(null);
+  const [mfaCode, setMfaCode] = useState("");
+  const [mfaEnabled, setMfaEnabled] = useState(Boolean(user?.mfa_enabled || data?.profile?.mfa_enabled));
+  const [mfaFeedback, setMfaFeedback] = useState("");
   const [audience, setAudience] = useState("citizen");
   const [publicMode, setPublicMode] = useState("question");
   const [trackCode, setTrackCode] = useState("");
   const [trackCase, setTrackCase] = useState("");
   const [publicFile, setPublicFile] = useState(null);
   const publicFileInput = useRef();
+  useEffect(() => {
+    if (kind === "settings") setMfaEnabled(Boolean(user?.mfa_enabled || data?.profile?.mfa_enabled));
+  }, [kind, user?.mfa_enabled, data?.profile?.mfa_enabled]);
   const config = {
     cases: ["MY CASES", "Case workspaces", "Case overview, team access and timeline are available in one controlled workspace."],
     collaboration: ["COLLABORATION", "Authorized collaboration", "Track pending actions, notifications and controlled inter-department access."],
@@ -632,8 +639,30 @@ function FeatureHub({kind, data, load, user, notify}) {
     catch (error) { notify(error.message); }
   };
   const setupMfa = async () => {
-    try { setResult(await request("/auth/mfa/setup", {method: "POST"})); notify("MFA setup secret generated"); }
-    catch (error) { notify(error.message); }
+    setMfaFeedback("");
+    try {
+      setMfaSetup(await request("/auth/mfa/setup", {method: "POST"}));
+      setMfaCode("");
+      notify("MFA setup secret generated");
+    } catch (error) {
+      setMfaFeedback(`Unable to start MFA setup: ${error.message}`);
+    }
+  };
+  const verifyMfa = async (event) => {
+    event.preventDefault();
+    setMfaFeedback("");
+    const form = new FormData();
+    form.append("code", mfaCode.trim());
+    try {
+      await request("/auth/mfa/verify", {method: "POST", body: form});
+      setMfaEnabled(true);
+      setMfaSetup(null);
+      setMfaCode("");
+      setMfaFeedback("MFA is enabled. Use a code from your authenticator app each time you sign in.");
+      notify("MFA enabled");
+    } catch (error) {
+      setMfaFeedback(`MFA verification failed: ${error.message}`);
+    }
   };
   const createBackup = async () => {
     try { setResult(await request("/backups", {method: "POST"})); notify("Backup created successfully"); }
@@ -667,11 +696,30 @@ function FeatureHub({kind, data, load, user, notify}) {
         {kind === "admin" && <p className="mt-5 rounded-xl bg-white/[.03] p-4 text-xs text-slate-400">Administrator-only statistics include users, roles, security events and blockchain integrity records.</p>}
         {kind === "settings" && <div className="mt-5 space-y-3">
           <div className="rounded-xl bg-white/[.03] p-4 text-xs text-slate-400">Current signed-in role: <span className="font-semibold text-mint">{user?.role || "unknown"}</span>. Use the controls below to manage workspace security services.</div>
-          <div className="flex flex-wrap gap-2">
-            <button onClick={setupMfa} className="rounded-lg border border-electric/25 px-3 py-2 text-xs font-semibold text-electric hover:bg-electric/10">Set up MFA</button>
-            {user?.role === "admin" && <button onClick={createBackup} className="rounded-lg border border-mint/25 px-3 py-2 text-xs font-semibold text-mint hover:bg-mint/10">Create encrypted backup</button>}
+          <div className="rounded-xl border border-white/10 bg-white/[.03] p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-slate-200">Multi-factor authentication</div>
+                <div className={`mt-1 text-xs ${mfaEnabled ? "text-mint" : "text-amber-300"}`}>{mfaEnabled ? "Enabled" : "Not enabled"}</div>
+              </div>
+              {!mfaEnabled && <button onClick={setupMfa} className="rounded-lg border border-electric/25 px-3 py-2 text-xs font-semibold text-electric hover:bg-electric/10">Set up MFA</button>}
+              {user?.role === "admin" && <button onClick={createBackup} className="rounded-lg border border-mint/25 px-3 py-2 text-xs font-semibold text-mint hover:bg-mint/10">Create encrypted backup</button>}
+            </div>
+            {mfaSetup && !mfaEnabled && <div className="mt-4 space-y-3">
+              <div className="rounded-lg border border-amber-300/20 bg-amber-300/5 p-3 text-xs leading-5 text-amber-100">
+                Add this secret to your authenticator app using its manual setup option, then enter the current six-digit code below. Keep the secret private and do not share it.
+                <div className="mt-2 break-all rounded bg-black/20 p-2 font-mono text-amber-200">{mfaSetup.secret}</div>
+              </div>
+              <form onSubmit={verifyMfa} className="flex flex-wrap items-end gap-2">
+                <label className="min-w-48 flex-1 text-xs text-slate-400">Authenticator code
+                  <input value={mfaCode} onChange={event => setMfaCode(event.target.value.replace(/\D/g, "").slice(0, 6))} required inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} placeholder="123456" className="mt-1 w-full rounded-lg border border-white/10 bg-ink px-3 py-2 text-sm tracking-[.3em] text-slate-100" />
+                </label>
+                <button type="submit" disabled={mfaCode.length !== 6} className="rounded-lg bg-mint px-3 py-2.5 text-xs font-bold text-ink disabled:cursor-not-allowed disabled:opacity-40">Verify and enable</button>
+              </form>
+            </div>}
+            {mfaFeedback && <div role={mfaEnabled ? "status" : "alert"} className={`mt-3 rounded-lg p-3 text-xs leading-5 ${mfaEnabled ? "bg-mint/10 text-mint" : "bg-amber-300/10 text-amber-200"}`}>{mfaFeedback}</div>}
+            <p className="mt-3 text-[11px] leading-5 text-slate-500">After enabling, enter the code from your authenticator app when signing in. NyayVault never needs you to send that code in chat.</p>
           </div>
-          {result?.secret && <div className="rounded-lg border border-amber-300/20 bg-amber-300/5 p-3 text-xs text-amber-200">Save this MFA secret for your authenticator: <span className="font-mono">{result.secret}</span></div>}
         </div>}
       </section>
     </div></>;
@@ -1389,6 +1437,7 @@ function LoadingScreen() {
 function Auth({onDone,notify}) {
   const [register,setRegister] = useState(true);
   const [forgot,setForgot] = useState(false);
+  const [loginMfaRequired, setLoginMfaRequired] = useState(false);
   const [resetToken,setResetToken] = useState("");
   const [loading,setLoading] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState("");
@@ -1460,11 +1509,18 @@ function Auth({onDone,notify}) {
         notify("Account created. Please sign in with your new account.");
         return;
       }
-      const result = await request("/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:values.email,password:values.password})});
+      const loginPayload = {email: values.email, password: values.password};
+      if (loginMfaRequired) loginPayload.mfa_code = String(values.mfa_code || "").trim();
+      const result = await request("/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(loginPayload)});
       localStorage.setItem(tokenKey,result.access_token);
       onDone();
     } catch(error) {
       const message = error.message || "Unable to authenticate";
+      if (!register && message === "MFA code required") {
+        setLoginMfaRequired(true);
+        setAuthError("Enter the current six-digit code from your authenticator app to finish signing in.");
+        return;
+      }
       setAuthError(message);
       notify(message);
     } finally {setLoading(false)}
@@ -1508,12 +1564,13 @@ function Auth({onDone,notify}) {
           {register && <label>Department<select name="department" defaultValue="investigations"><option value="investigations">Investigations</option><option value="police">Police</option><option value="forensics">Forensics</option><option value="prosecution">Prosecution</option><option value="court">Court</option><option value="public">Public assistance</option></select></label>}
           <label>Work email<input name="email" required type="email" autoComplete="email" defaultValue={!register ? registeredEmail : ""} placeholder="name@organization.gov" /></label>
           <label>Password<input name="password" required minLength="8" type="password" autoComplete={register ? "new-password" : "current-password"} placeholder="Minimum 8 characters" /></label>
+          {!register && loginMfaRequired && <label>Authenticator code<input name="mfa_code" required inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} placeholder="Six-digit code" /></label>}
           <button type="submit" disabled={loading}>{loading ? "Authenticating…" : <>{register ? "Create account" : "Enter secure workspace"} <ArrowUpRight size={15}/></>}</button>
         </form>
         }
         {authError && <div role="alert" className="mt-3 rounded-xl border border-red-300/20 bg-red-400/10 px-3 py-2 text-xs text-red-200">{authError}</div>}
         <div className="auth-note"><ShieldCheck size={14}/> Your session is protected with role-based access control.</div>
-        {forgot ? <button type="button" onClick={() => { setForgot(false); setResetToken(""); setAuthError(""); }} className="auth-switch">Back to sign in <ChevronRight size={13}/></button> : <>{!register && <button type="button" onClick={() => { setForgot(true); setAuthError(""); }} className="auth-switch">Forgot password? <ChevronRight size={13}/></button>}<button type="button" onClick={() => { setRegister(!register); setAuthError(""); }} className="auth-switch">{register ? "I already have an account" : "Create a new account"} <ChevronRight size={13}/></button></>}
+        {forgot ? <button type="button" onClick={() => { setForgot(false); setResetToken(""); setAuthError(""); }} className="auth-switch">Back to sign in <ChevronRight size={13}/></button> : <>{!register && <button type="button" onClick={() => { setForgot(true); setAuthError(""); }} className="auth-switch">Forgot password? <ChevronRight size={13}/></button>}<button type="button" onClick={() => { setRegister(!register); setLoginMfaRequired(false); setAuthError(""); }} className="auth-switch">{register ? "I already have an account" : "Create a new account"} <ChevronRight size={13}/></button></>}
       </section>
     </div>
   </div>;

@@ -230,6 +230,11 @@ class PasswordResetConfirmRequest(BaseModel):
     password: str = Field(min_length=8)
 
 
+class PasswordChangeRequest(BaseModel):
+    current_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=8)
+
+
 class CaseRequest(BaseModel):
     case_number: str
     title: str
@@ -765,6 +770,19 @@ def confirm_password_reset(request: PasswordResetConfirmRequest, db: Session = D
     write_audit(db, "user.password_reset_completed", "user", user.id, None)
     db.commit()
     return {"message": "Password updated. You can now sign in with your new password."}
+
+
+@app.post("/api/auth/password/change")
+def change_password(request: PasswordChangeRequest, db: Session = Depends(get_db),
+                    user: User = Depends(current_user)):
+    if not verify_password(request.current_password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    if verify_password(request.new_password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Choose a new password different from the current password")
+    user.hashed_password = get_password_hash(request.new_password)
+    write_audit(db, "user.password_changed", "user", user.id, user.id)
+    db.commit()
+    return {"message": "Password changed successfully"}
 
 
 @app.post("/api/auth/logout")

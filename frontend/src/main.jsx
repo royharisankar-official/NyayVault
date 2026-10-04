@@ -341,7 +341,7 @@ function App() {
         {view === "docker" && <SystemPage kind="docker" system={system}/>}
         {view === "scripts" && <SystemPage kind="scripts" system={system}/>}
         {view === "cases" && <CaseWorkspace notify={notify}/>}
-        {["collaboration", "public", "admin", "settings"].includes(view) && <FeatureHub kind={view} data={featureData[view]} load={() => loadFeature(view)} user={user} notify={notify}/>}
+        {["collaboration", "public", "admin", "settings"].includes(view) && <FeatureHub kind={view} data={featureData[view]} load={() => loadFeature(view)} user={user} notify={notify} theme={theme} setTheme={setTheme} onNavigate={next => {setView(next); loadFeature(next);}}/>}
       </main>
     </div>
     {showAuth && <Auth onDone={() => {setShowAuth(false);refresh()}} notify={notify}/>}
@@ -586,7 +586,7 @@ function CaseWorkspace({notify}) {
     </div></>;
 }
 
-function FeatureHub({kind, data, load, user, notify}) {
+function FeatureHub({kind, data, load, user, notify, theme, setTheme, onNavigate}) {
   const [input, setInput] = useState("");
   const [result, setResult] = useState(null);
   const [mfaSetup, setMfaSetup] = useState(null);
@@ -596,6 +596,9 @@ function FeatureHub({kind, data, load, user, notify}) {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshFeedback, setRefreshFeedback] = useState("");
   const [refreshedAt, setRefreshedAt] = useState(null);
+  const [passwordFeedback, setPasswordFeedback] = useState("");
+  const [passwordChangeSucceeded, setPasswordChangeSucceeded] = useState(false);
+  const [passwordBusy, setPasswordBusy] = useState(false);
   const [audience, setAudience] = useState("citizen");
   const [publicMode, setPublicMode] = useState("question");
   const [trackCode, setTrackCode] = useState("");
@@ -675,6 +678,35 @@ function FeatureHub({kind, data, load, user, notify}) {
     try { setResult(await request("/backups", {method: "POST"})); notify("Backup created successfully"); }
     catch (error) { notify(error.message); }
   };
+  const changePassword = async (event) => {
+    event.preventDefault();
+    setPasswordFeedback("");
+    setPasswordChangeSucceeded(false);
+    const form = event.currentTarget;
+    const values = Object.fromEntries(new FormData(form));
+    if (values.new_password !== values.confirm_password) {
+      setPasswordFeedback("The new passwords do not match.");
+      return;
+    }
+    setPasswordBusy(true);
+    try {
+      const response = await request("/auth/password/change", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          current_password: values.current_password,
+          new_password: values.new_password,
+        }),
+      });
+      form.reset();
+      setPasswordFeedback(response.message);
+      setPasswordChangeSucceeded(true);
+    } catch (error) {
+      setPasswordFeedback(error.message);
+    } finally {
+      setPasswordBusy(false);
+    }
+  };
   const refreshFeature = async () => {
     setRefreshing(true);
     setRefreshFeedback("");
@@ -709,13 +741,22 @@ function FeatureHub({kind, data, load, user, notify}) {
         {result && <div className="mt-4 rounded-xl border border-mint/20 bg-mint/5 p-4 text-xs text-slate-300"><pre className="whitespace-pre-wrap">{JSON.stringify(result, null, 2)}</pre></div>}
       </section>
       <section className="rounded-2xl border border-white/10 bg-panel/70 p-6">
-        <h3 className="font-bold">Quick action</h3>
-        <p className="mt-1 text-xs leading-5 text-slate-500">Use the same controlled API surfaces used by the workspace.</p>
+        <h3 className="font-bold">{kind === "settings" ? "Security & preferences" : "Quick action"}</h3>
+        <p className="mt-1 text-xs leading-5 text-slate-500">{kind === "settings" ? "Manage your sign-in security and personal workspace preferences." : "Use the same controlled API surfaces used by the workspace."}</p>
         {kind === "public" && <><div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-5">{[["question", "Ask question"], ["complaint", "File complaint"], ["document", "Personal document"], ["track", "Track status"], ["resources", "Law library"]].map(([id, label]) => <button key={id} onClick={() => {setPublicMode(id); setResult(null);}} className={`rounded-lg border px-3 py-2 text-xs ${publicMode === id ? "border-electric bg-electric/10 text-electric" : "border-white/10 text-slate-400"}`}>{label}</button>)}</div>        {publicMode !== "track" && publicMode !== "resources" && <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">{[["citizen", "Citizen"], ["student", "Student"], ["lawyer", "Lawyer"], ["victim", "Victim / complainant"]].map(([id, label]) => <button key={id} onClick={() => setAudience(id)} className={`rounded-lg border px-3 py-2 text-xs ${audience === id ? "border-electric bg-electric/10 text-electric" : "border-white/10 text-slate-400"}`}>{label}</button>)}</div>}{publicMode === "question" && <><textarea value={input} onChange={event => setInput(event.target.value)} placeholder="Ask a general legal question. Try: What records should I preserve after an incident?" className="mt-4 min-h-28 w-full rounded-xl border border-white/10 bg-white/[.03] p-3 text-sm outline-none"/><div className="mt-3 flex flex-wrap gap-2"><button onClick={() => action("/public/legal-question", {question: input || "Explain my legal options", audience})} className="rounded-lg bg-electric px-3 py-2 text-xs font-bold text-ink">Ask NyAI</button><button onClick={() => action("/public/assistance", {question: input || "Guide me", audience})} className="rounded-lg border border-electric/25 px-3 py-2 text-xs text-electric">Plain-language guide</button></div></>}{publicMode === "complaint" && <><textarea value={input} onChange={event => setInput(event.target.value)} placeholder="Describe what happened, when, where and who was involved. Do not include confidential investigation records." className="mt-4 min-h-32 w-full rounded-xl border border-white/10 bg-white/[.03] p-3 text-sm outline-none"/><button onClick={() => action("/public/complaint-draft", {facts: input || "My complaint facts", language: "English"})} className="mt-3 rounded-lg bg-mint px-3 py-2 text-xs font-bold text-ink">Create editable complaint</button></>}{publicMode === "document" && <><input ref={publicFileInput} type="file" hidden accept=".pdf,.jpg,.jpeg,.png,.txt,.doc,.docx" onChange={event => setPublicFile(event.target.files[0])}/><button onClick={() => publicFileInput.current.click()} className="mt-4 w-full rounded-xl border border-dashed border-mint/30 bg-mint/[.04] p-8 text-sm text-slate-300"><UploadCloud size={24} className="mx-auto mb-2 text-mint"/>{publicFile ? publicFile.name : "Choose a personal document for in-memory review"}</button><button disabled={!publicFile} onClick={async () => {const form = new FormData(); form.append("document", publicFile); try {setResult(await request("/public/personal-document/upload", {method:"POST", body:form}));} catch(error) {notify(error.message);}}} className="mt-3 rounded-lg border border-mint/25 px-3 py-2 text-xs font-semibold text-mint disabled:opacity-40">Review document securely</button><p className="mt-2 text-[11px] text-slate-500">Public uploads are not stored in the secure case repository.</p></>}{publicMode === "track" && <><input value={trackCase} onChange={event => setTrackCase(event.target.value)} placeholder="Case ID / case number" className="mt-4 w-full rounded-xl border border-white/10 bg-white/[.03] p-3 text-sm"/><input value={trackCode} onChange={event => setTrackCode(event.target.value)} placeholder="Verification code supplied by the agency" className="mt-2 w-full rounded-xl border border-white/10 bg-white/[.03] p-3 text-sm"/><button onClick={() => action("/public/case-track", {case_number: trackCase || "CASE-2026-0142", verification_code: trackCode})} className="mt-3 rounded-lg bg-electric px-3 py-2 text-xs font-bold text-ink">View public status</button><p className="mt-2 text-[11px] text-slate-500">Only an agency-published status snapshot is queried; confidential documents remain private.</p></>}{publicMode === "resources" && <button onClick={async () => {try {setResult(await request("/public/legal-resources"));} catch(error) {notify(error.message);}}} className="mt-4 rounded-lg bg-electric px-3 py-2 text-xs font-bold text-ink">Open public law library</button>}{result && <div className="mt-5 rounded-xl border border-mint/20 bg-mint/5 p-4"><div className="mb-2 text-xs font-bold uppercase tracking-widest text-mint">Public result</div><pre className="max-h-80 overflow-auto whitespace-pre-wrap text-xs leading-6 text-slate-300">{JSON.stringify(result, null, 2)}</pre></div>}</>}
         {kind === "cases" && <p className="mt-5 rounded-xl bg-white/[.03] p-4 text-xs text-slate-400">Case creation remains available through the secure API and existing upload workflow. Case-specific timelines and collaborators are retained with every case.</p>}
         {kind === "collaboration" && <p className="mt-5 rounded-xl bg-white/[.03] p-4 text-xs text-slate-400">Notifications, permissions, controlled sharing and collaborator records are audited for accountability.</p>}
         {kind === "admin" && <p className="mt-5 rounded-xl bg-white/[.03] p-4 text-xs text-slate-400">Administrator-only statistics include users, roles, security events and blockchain integrity records.</p>}
-        {kind === "settings" && <div className="mt-5 space-y-3">
+        {kind === "settings" && <div className="mt-5 space-y-4">
+          <div className="rounded-xl border border-white/10 bg-white/[.03] p-4">
+            <div className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Account</div>
+            <dl className="grid gap-2 text-xs sm:grid-cols-2">
+              <div><dt className="text-slate-500">Name</dt><dd className="mt-1 font-semibold text-slate-200">{data?.profile?.full_name || user?.full_name || "Not available"}</dd></div>
+              <div><dt className="text-slate-500">Email</dt><dd className="mt-1 break-all font-semibold text-slate-200">{data?.profile?.email || "Not available"}</dd></div>
+              <div><dt className="text-slate-500">Role</dt><dd className="mt-1 font-semibold text-slate-200">{(data?.profile?.role || user?.role || "unknown").replaceAll("_", " ")}</dd></div>
+              <div><dt className="text-slate-500">Department</dt><dd className="mt-1 font-semibold text-slate-200">{data?.profile?.department || "Not available"}</dd></div>
+            </dl>
+          </div>
           <div className="rounded-xl bg-white/[.03] p-4 text-xs text-slate-400">Current signed-in role: <span className="font-semibold text-mint">{user?.role || "unknown"}</span>. Use the controls below to manage workspace security services.</div>
           <div className="rounded-xl border border-white/10 bg-white/[.03] p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -740,6 +781,29 @@ function FeatureHub({kind, data, load, user, notify}) {
             </div>}
             {mfaFeedback && <div role={mfaEnabled ? "status" : "alert"} className={`mfa-feedback mt-3 rounded-lg p-3 text-xs leading-5 ${mfaEnabled ? "bg-mint/10 text-mint" : "mfa-feedback-error bg-amber-300/10 text-amber-200"}`}>{mfaFeedback}</div>}
             <p className="mt-3 text-[11px] leading-5 text-slate-500">After enabling, enter the code from your authenticator app when signing in. NyayVault never needs you to send that code in chat.</p>
+          </div>
+          <form onSubmit={changePassword} className="rounded-xl border border-white/10 bg-white/[.03] p-4">
+            <div className="mb-1 text-sm font-semibold text-slate-200">Change password</div>
+            <p className="mb-3 text-[11px] leading-5 text-slate-500">Choose a new password with at least eight characters.</p>
+            <div className="space-y-2">
+              <input name="current_password" type="password" required autoComplete="current-password" placeholder="Current password" className="w-full rounded-lg border border-white/10 bg-ink px-3 py-2 text-xs"/>
+              <input name="new_password" type="password" required minLength={8} autoComplete="new-password" placeholder="New password (8+ characters)" className="w-full rounded-lg border border-white/10 bg-ink px-3 py-2 text-xs"/>
+              <input name="confirm_password" type="password" required minLength={8} autoComplete="new-password" placeholder="Confirm new password" className="w-full rounded-lg border border-white/10 bg-ink px-3 py-2 text-xs"/>
+            </div>
+            <button type="submit" disabled={passwordBusy} className="mt-3 rounded-lg border border-electric/25 px-3 py-2 text-xs font-semibold text-electric disabled:opacity-50">{passwordBusy ? "Updating..." : "Update password"}</button>
+            {passwordFeedback && <p role={passwordChangeSucceeded ? "status" : "alert"} className={`mt-2 text-xs ${passwordChangeSucceeded ? "text-mint" : "text-red-400"}`}>{passwordFeedback}</p>}
+          </form>
+          <div className="rounded-xl border border-white/10 bg-white/[.03] p-4">
+            <div className="text-sm font-semibold text-slate-200">Appearance</div>
+            <p className="mt-1 text-[11px] leading-5 text-slate-500">Choose the theme for this browser.</p>
+            <div className="mt-3 flex gap-2">
+              {["light", "dark"].map(option => <button key={option} type="button" aria-pressed={theme === option} onClick={() => setTheme(option)} className={`rounded-lg border px-3 py-2 text-xs capitalize ${theme === option ? "border-mint/40 bg-mint/10 text-mint" : "border-white/10 text-slate-400"}`}>{option} theme</button>)}
+            </div>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/[.03] p-4">
+            <div className="text-sm font-semibold text-slate-200">Notifications</div>
+            <p className="mt-1 text-[11px] leading-5 text-slate-500">NyayVault notifications are available in Collaboration. Email and browser push delivery are not configured.</p>
+            <button type="button" onClick={() => onNavigate("collaboration")} className="mt-3 rounded-lg border border-electric/25 px-3 py-2 text-xs font-semibold text-electric">Open collaboration</button>
           </div>
         </div>}
       </section>

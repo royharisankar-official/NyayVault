@@ -1918,6 +1918,33 @@ def download_shared_document(share_token: str, db: Session = Depends(get_db)):
     }, media_type=mimetypes.guess_type(item.filename)[0] or "application/octet-stream")
 
 
+@app.get("/api/cases/{case_id}/collaborator-candidates")
+def collaborator_candidates(
+    case_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles("admin", "police", "investigator")),
+):
+    if not db.get(Case, case_id):
+        raise HTTPException(status_code=404, detail="Case not found")
+    if user.role != "admin" and not db.query(CaseCollaborator).filter(
+        CaseCollaborator.case_id == case_id,
+        CaseCollaborator.user_id == user.id,
+    ).first():
+        raise HTTPException(status_code=403, detail="Case access is not authorized")
+    existing_user_ids = select(CaseCollaborator.user_id).where(
+        CaseCollaborator.case_id == case_id
+    )
+    return [{
+        "id": item.id,
+        "name": item.full_name,
+        "role": item.role,
+        "department": item.department,
+    } for item in db.query(User).filter(
+        User.is_active.is_(True),
+        User.id.not_in(existing_user_ids),
+    ).order_by(User.full_name).all()]
+
+
 @app.post("/api/cases/{case_id}/collaborators")
 def add_collaborator(case_id: int, request: CollaboratorRequest,
                      db: Session = Depends(get_db),

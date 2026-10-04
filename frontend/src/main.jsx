@@ -412,6 +412,9 @@ function CaseWorkspace({notify}) {
   const [refreshedAt, setRefreshedAt] = useState(null);
   const seedAttempted = useRef(false);
   const [collaborator, setCollaborator] = useState({user_id:"", department:"Forensic Lab", access_level:"contributor"});
+  const [collaboratorCandidates, setCollaboratorCandidates] = useState([]);
+  const [candidatesLoading, setCandidatesLoading] = useState(false);
+  const [teamFeedback, setTeamFeedback] = useState("");
   const loadCases = async (allowDemoSeed = true) => {
     try {
       const result = await request(`/cases/workspace?refresh=${Date.now()}`);
@@ -454,6 +457,21 @@ function CaseWorkspace({notify}) {
       else notify(error.message);
     }
   };
+  const loadCollaboratorCandidates = async (caseId) => {
+    if (!caseId || String(caseId).startsWith("demo-")) {
+      setCollaboratorCandidates([]);
+      return;
+    }
+    setCandidatesLoading(true);
+    try {
+      setCollaboratorCandidates(await request(`/cases/${caseId}/collaborator-candidates`));
+    } catch (error) {
+      setCollaboratorCandidates([]);
+      setTeamFeedback(`Unable to load registered users: ${error.message}`);
+    } finally {
+      setCandidatesLoading(false);
+    }
+  };
   const loadDemoCases = async () => {
     if (seeding) return;
     seedAttempted.current = true;
@@ -481,7 +499,13 @@ function CaseWorkspace({notify}) {
     }
   };
   useEffect(() => { loadCases(); }, []);
-  useEffect(() => { if (selected) loadDetail(selected); }, [selected]);
+  useEffect(() => {
+    if (selected) {
+      loadDetail(selected);
+      setTeamFeedback("");
+      loadCollaboratorCandidates(selected);
+    }
+  }, [selected]);
   useEffect(() => { setPublicStatus(null); }, [selected]);
   const addEvent = async () => {
     if (!eventNotes.trim()) return;
@@ -495,22 +519,34 @@ function CaseWorkspace({notify}) {
     if (busy) return;
     const userId = Number.parseInt(String(collaborator.user_id).trim(), 10);
     if (!Number.isInteger(userId) || userId < 1) {
-      notify("Enter a valid authorized user ID");
+      setTeamFeedback("Select a registered NyayVault user before adding them.");
       return;
     }
     if (String(selected).startsWith("demo-")) {
-      notify("Refresh the case workspace before adding a collaborator");
+      setTeamFeedback("Refresh the case workspace before adding a collaborator.");
       return;
     }
     if (!collaborator.department.trim()) {
-      notify("Enter a department");
+      setTeamFeedback("Enter the collaborator's department.");
       return;
     }
     setBusy(true);
+    setTeamFeedback("");
     try {
       await request(`/cases/${selected}/collaborators`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({...collaborator, user_id:userId, department:collaborator.department.trim()})});
-      setCollaborator({...collaborator, user_id:""}); await loadDetail(selected); notify("Controlled collaborator added");
-    } catch (error) { notify(`Unable to add collaborator: ${error.message}`); }
+      setCollaborator({...collaborator, user_id:""});
+      const updatedDetail = await request(`/cases/${selected}?refresh=${Date.now()}`);
+      setDetail(updatedDetail);
+      await loadCollaboratorCandidates(selected);
+      setTeamFeedback("Collaborator added. They now appear in the Case team list above.");
+      notify("Controlled collaborator added");
+    } catch (error) {
+      const message = error.message.includes("MFA enrollment is required")
+        ? "Enable MFA in Settings before adding collaborators."
+        : error.message;
+      setTeamFeedback(`Unable to add collaborator: ${message}`);
+      notify(`Unable to add collaborator: ${message}`);
+    }
     finally { setBusy(false); }
   };
   const askCase = async () => {
@@ -541,7 +577,7 @@ function CaseWorkspace({notify}) {
       <section className="space-y-5">{detail ? <><div className="rounded-2xl border border-white/10 bg-panel/70 p-6"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="font-mono text-xs text-electric">{detail.case_number}</div><h2 className="mt-2 text-2xl font-black">{detail.title}</h2><p className="mt-1 text-sm text-slate-400">{detail.fir_number || "FIR not recorded"} · {detail.police_station || "Police station not recorded"}</p></div><span className="rounded-full bg-mint/10 px-3 py-1 text-xs font-bold uppercase text-mint">{detail.status.replaceAll("_"," ")}</span></div><div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><div className="rounded-xl bg-white/[.03] p-3"><div className="text-[10px] uppercase text-slate-500">Investigating officer</div><div className="mt-1 text-sm font-semibold">{detail.investigating_officer?.name || "Not assigned"}</div><div className="mt-1 text-[10px] text-slate-500">{detail.investigating_officer?.role?.replaceAll("_"," ") || "Team pending"}</div></div><div className="rounded-xl bg-white/[.03] p-3"><div className="text-[10px] uppercase text-slate-500">Sensitivity</div><div className="mt-1 text-sm font-semibold text-amber-300">{detail.sensitivity.replaceAll("_"," ")}</div><div className="mt-1 text-[10px] text-slate-500">Access-controlled workspace</div></div><div className="rounded-xl bg-white/[.03] p-3"><div className="text-[10px] uppercase text-slate-500">Protected records</div><div className="mt-1 text-sm font-semibold text-mint">{detail.documents.length}</div><div className="mt-1 text-[10px] text-slate-500">{detail.timeline.length} timeline events</div></div><div className="rounded-xl bg-white/[.03] p-3"><div className="text-[10px] uppercase text-slate-500">Team access</div><div className="mt-1 text-sm font-semibold text-electric">{detail.team.length} members</div><div className="mt-1 text-[10px] text-slate-500">Controlled collaboration</div></div></div></div>
         <div className="grid gap-3 sm:grid-cols-3"><div className="rounded-2xl border border-electric/20 bg-electric/5 p-4"><div className="text-[10px] font-bold uppercase tracking-wider text-electric">Next recommended milestone</div><p className="mt-2 text-sm leading-5 text-slate-200">{nextMilestone}</p></div><div className="rounded-2xl border border-white/10 bg-panel/70 p-4"><div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Latest verified event</div><p className="mt-2 text-sm font-semibold text-slate-200">{latestEvent?.event_type?.replaceAll("_"," ") || "No event recorded"}</p><p className="mt-1 text-[11px] text-slate-500">{latestEvent?.event_at ? formatExactDateTime(latestEvent.event_at) : "Awaiting update"}</p></div><div className="rounded-2xl border border-white/10 bg-panel/70 p-4"><div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Workspace dates</div><p className="mt-2 text-[11px] text-slate-400">Created: {detail.created_at ? formatExactDateTime(detail.created_at) : "Not available"}</p><p className="mt-1 text-[11px] text-slate-400">Updated: {detail.updated_at ? formatExactDateTime(detail.updated_at) : "Not available"}</p></div></div>
         <div className="grid gap-5 lg:grid-cols-2"><section className="rounded-2xl border border-white/10 bg-panel/70 p-5"><div className="mb-4 flex items-center justify-between"><div><h3 className="font-bold">Case timeline</h3><p className="mt-1 text-xs text-slate-500">FIR registration through judgment</p></div><Activity size={17} className="text-mint"/></div><div className="space-y-3">{detail.timeline.map(item => <div key={item.id} className="flex gap-3"><div className="mt-1 h-2 w-2 rounded-full bg-mint shadow-[0_0_8px_#5ff0c1]"/><div><div className="text-sm font-semibold">{item.event_type.replaceAll("_"," ")}</div><div className="text-xs text-slate-400">{item.notes}</div><div className="mt-1 text-[10px] text-slate-600">{item.event_at ? new Date(item.event_at).toLocaleString() : "now"}</div></div></div>)}</div><div className="mt-4 border-t border-white/5 pt-4"><select value={eventType} onChange={event => setEventType(event.target.value)} className="mb-2 w-full rounded-lg border border-white/10 bg-ink px-3 py-2 text-xs"><option value="fir_registered">FIR registered</option><option value="investigation_started">Investigation started</option><option value="evidence_collected">Evidence collected</option><option value="charge_sheet_prepared">Charge sheet prepared</option><option value="court_filing">Court filing</option><option value="judgment">Judgment</option></select><textarea value={eventNotes} onChange={event => setEventNotes(event.target.value)} placeholder="Add a verified case event note…" className="w-full rounded-lg border border-white/10 bg-ink p-3 text-xs" rows="2"/><button onClick={addEvent} disabled={busy} className="mt-2 rounded-lg bg-mint px-3 py-2 text-xs font-bold text-ink">Add timeline event</button></div></section>
-        <section className="rounded-2xl border border-white/10 bg-panel/70 p-5"><div className="mb-4 flex items-center justify-between"><div><h3 className="font-bold">Case team</h3><p className="mt-1 text-xs text-slate-500">Controlled inter-agency access</p></div><Users size={17} className="text-electric"/></div><div className="space-y-2">{detail.team.map(member => <div key={`${member.user_id}-${member.department}`} className="flex items-center justify-between rounded-xl bg-white/[.03] p-3"><div><div className="text-sm font-semibold">{member.name}</div><div className="text-xs text-slate-500">{member.department} · {member.role}</div></div><span className="text-[10px] uppercase text-mint">{member.access_level}</span></div>)}</div><div className="mt-4 border-t border-white/5 pt-4"><input value={collaborator.user_id} onChange={event => setCollaborator({...collaborator,user_id:event.target.value})} placeholder="Authorized user ID" inputMode="numeric" className="mb-2 w-full rounded-lg border border-white/10 bg-ink px-3 py-2 text-xs"/><div className="grid grid-cols-2 gap-2"><input value={collaborator.department} onChange={event => setCollaborator({...collaborator,department:event.target.value})} placeholder="Department" className="rounded-lg border border-white/10 bg-ink px-3 py-2 text-xs"/><select value={collaborator.access_level} onChange={event => setCollaborator({...collaborator,access_level:event.target.value})} className="rounded-lg border border-white/10 bg-ink px-3 py-2 text-xs"><option value="viewer">Viewer</option><option value="contributor">Contributor</option><option value="approver">Approver</option></select></div><button onClick={addTeamMember} disabled={busy} className="mt-2 rounded-lg border border-electric/25 px-3 py-2 text-xs font-semibold text-electric disabled:cursor-wait disabled:opacity-50">{busy ? "Adding..." : "Add collaborator"}</button></div></section></div>
+        <section className="rounded-2xl border border-white/10 bg-panel/70 p-5"><div className="mb-4 flex items-center justify-between"><div><h3 className="font-bold">Case team</h3><p className="mt-1 text-xs text-slate-500">Registered NyayVault accounts with access to this case</p></div><Users size={17} className="text-electric"/></div><div className="space-y-2">{detail.team.map(member => <div key={`${member.user_id}-${member.department}`} className="flex items-center justify-between rounded-xl bg-white/[.03] p-3"><div><div className="text-sm font-semibold">{member.name}</div><div className="text-xs text-slate-500">{member.department} · {member.role} · ID {member.user_id}</div></div><span className="text-[10px] uppercase text-mint">{member.access_level}</span></div>)}</div><div className="mt-4 border-t border-white/5 pt-4"><p className="mb-2 text-[11px] leading-5 text-slate-400">Select an existing registered account below. Phone numbers are not user IDs. New collaborators must register for NyayVault first.</p><select value={collaborator.user_id} onChange={event => setCollaborator({...collaborator,user_id:event.target.value})} disabled={candidatesLoading || !collaboratorCandidates.length} className="mb-2 w-full rounded-lg border border-white/10 bg-ink px-3 py-2 text-xs disabled:opacity-60"><option value="">{candidatesLoading ? "Loading registered accounts…" : collaboratorCandidates.length ? "Select a registered user" : "No eligible registered users available"}</option>{collaboratorCandidates.map(candidate => <option key={candidate.id} value={candidate.id}>ID {candidate.id} · {candidate.name} · {candidate.department} · {candidate.role}</option>)}</select>{!candidatesLoading && !collaboratorCandidates.length && <p className="mb-2 text-[11px] text-amber-300">Register another NyayVault account before adding a teammate.</p>}<div className="grid grid-cols-2 gap-2"><input value={collaborator.department} onChange={event => setCollaborator({...collaborator,department:event.target.value})} placeholder="Department" aria-label="Collaborator department" className="rounded-lg border border-white/10 bg-ink px-3 py-2 text-xs"/><select value={collaborator.access_level} onChange={event => setCollaborator({...collaborator,access_level:event.target.value})} aria-label="Collaborator access level" className="rounded-lg border border-white/10 bg-ink px-3 py-2 text-xs"><option value="viewer">Viewer</option><option value="contributor">Contributor</option><option value="approver">Approver</option></select></div><p className="mt-2 text-[11px] text-slate-500">Adding team members requires MFA. Enable it in Settings if the request is blocked.</p><button onClick={addTeamMember} disabled={busy || candidatesLoading || !collaboratorCandidates.length} className="mt-2 rounded-lg border border-electric/25 px-3 py-2 text-xs font-semibold text-electric disabled:cursor-wait disabled:opacity-50">{busy ? "Adding..." : "Add collaborator"}</button>{teamFeedback && <p role="status" className={`mt-3 rounded-lg border p-3 text-xs leading-5 ${teamFeedback.startsWith("Unable") ? "border-red-300/20 bg-red-300/5 text-red-200" : "border-mint/20 bg-mint/5 text-mint"}`}>{teamFeedback}</p>}</div></section></div>
         <section className="rounded-2xl border border-electric/20 bg-electric/5 p-5"><div className="mb-3 flex items-center gap-2"><BrainCircuit size={17} className="text-electric"/><div><h3 className="font-bold">Case-specific Ask</h3><p className="text-xs text-slate-500">Answers are limited to this case’s authorized documents.</p></div></div><div className="flex gap-2"><input value={question} onChange={event => setQuestion(event.target.value)} placeholder={`Ask about ${selectedSummary?.case_number || "this case"}…`} className="flex-1 rounded-lg border border-white/10 bg-ink px-3 py-3 text-sm"/><button onClick={askCase} className="rounded-lg bg-electric px-4 py-2 text-xs font-bold text-ink">Ask</button></div>{aiResult && <div className="mt-4 rounded-xl border border-white/10 bg-panel/80 p-4 text-sm"><p className="leading-6 text-slate-300">{aiResult.answer}</p><div className="mt-3 text-xs text-slate-500">{aiResult.sources?.length || 0} authorized source(s) · {aiResult.verified ? "verified against retrieved records" : "human review required"}</div></div>}<div className="mt-5 border-t border-white/10 pt-4"><div className="flex items-center justify-between gap-3"><div><div className="text-xs font-semibold text-slate-300">Public status exchange</div><div className="text-[11px] text-slate-500">Publishes a safe snapshot only; the public tier never reads the secure repository.</div></div><button onClick={publishPublicStatus} className="rounded-lg border border-mint/25 px-3 py-2 text-xs font-semibold text-mint">Publish approved status</button></div>{publicStatus && <div className="mt-3 rounded-lg bg-mint/5 p-3 text-xs text-mint">Verification code: <span className="font-mono font-bold">{publicStatus.verification_code}</span> · Share this code with the authorized complainant.</div>}</div></section></> : <div className="rounded-2xl border border-white/10 bg-panel/70 p-10 text-center text-sm text-slate-500">Select an authorized case to open its workspace.</div>}</section>
     </div></>;
 }

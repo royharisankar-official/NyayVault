@@ -321,7 +321,7 @@ function App() {
     </header>
     <div className="mx-auto flex max-w-[1500px]">
       <aside className={`${mobileNav ? "fixed inset-x-4 top-20 z-20 flex" : "hidden"} h-[calc(100dvh-6rem)] w-64 shrink-0 flex-col gap-4 lg:sticky lg:top-24 lg:flex lg:h-[calc(100dvh-7rem)] lg:self-start`}>
-        <section aria-label="Workspace navigation" className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-white/10 bg-panel p-3 shadow-2xl">
+        <section aria-label="Workspace navigation" className="workspace-navigation-card min-h-0 flex-1 overflow-y-auto rounded-2xl border border-white/10 bg-panel p-3 shadow-2xl">
           <div className="mb-7 px-3 pt-3 text-[10px] font-bold uppercase tracking-[.22em] text-slate-500">Workspace</div>
           <nav className="workspace-nav space-y-1">{nav.map(({id,label,icon: Icon}) => <button key={id} onClick={() => {if (id === "document-viewer") setSelectedDocument(null); setView(id); setMobileNav(false)}} className={`workspace-nav-item flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${view === id ? "bg-mint font-semibold text-ink shadow-lg shadow-mint/10" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}><Icon size={17}/>{label}{view === id && <ChevronRight size={15} className="ml-auto"/>}</button>)}</nav>
         </section>

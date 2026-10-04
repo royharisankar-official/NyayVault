@@ -30,6 +30,7 @@ option { color: #e8f0fb; background-color: #0d1b2e; }
 .animate-pulse-ring { animation: pulse-ring 2.8s ease-out infinite; }
 .bg-panel, .border-white\/10 { transition: background-color .5s ease, border-color .5s ease, color .5s ease, box-shadow .5s ease; }
 .bg-panel { position: relative; overflow: hidden; }
+.workspace-navigation-card { overflow-y: auto; }
 .font-mono { font-family: "DM Mono", ui-monospace, monospace; }
 .bg-panel::after { content: ""; position: absolute; inset: 0 auto 0 -70%; width: 45%; pointer-events: none; background: linear-gradient(105deg, transparent, rgba(255,255,255,.06), transparent); animation: shimmer 8s ease-in-out infinite; }
 .theme-toggle { animation: pulse-ring 3.5s ease-out infinite; }

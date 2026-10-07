@@ -323,7 +323,8 @@ def nvidia_generate(prompt: str, system_prompt: str) -> str:
             {"role": "system", "content": system_prompt[:12000]},
             {"role": "user", "content": prompt[:50000]},
         ],
-        "temperature": 0.2,
+        "temperature": 1.0,
+        "top_p": 0.95,
         "max_tokens": 2048,
         "stream": False,
     }).encode()

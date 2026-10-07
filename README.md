@@ -100,11 +100,11 @@ selected by updating the corresponding number in `VERSION` before pushing.
 ### Hosted AI assistant
 
 The secure assistant uses NVIDIA NIM when `NVIDIA_API_KEY` is configured, with
-the `meta/llama-3.3-70b-instruct` model by default. Add `NVIDIA_API_KEY` as a
-secret in the Render service's Environment settings; optionally set
+the `nvidia/nemotron-3-super-120b-a12b` model by default. Add `NVIDIA_API_KEY`
+as a secret in the Render service's Environment settings; optionally set
 `NVIDIA_MODEL` to another model enabled for that key. The key is used only by
 the backend and must never be placed in frontend code or committed files.
-Gemini remains a fallback when no NVIDIA key is configured.
+Gemini is used only when no NVIDIA key is configured.
 
 When a hosted model is enabled, the assistant sends the user's prompt and
 authorized retrieved document excerpts to that AI provider. Do not enable it

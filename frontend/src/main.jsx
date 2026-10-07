@@ -341,7 +341,7 @@ function App() {
   };
 
   if (booting) return <LoadingScreen />;
-  return <div className="app-shell overflow-x-hidden">
+  return <div className="app-shell">
     <div className="fixed inset-0 pointer-events-none grid-noise opacity-30" />
     <header className="sticky top-0 z-30 border-b border-white/10 bg-ink/85 backdrop-blur-xl">
       <div className="mx-auto flex max-w-[1500px] items-center justify-between px-4 py-3 sm:px-5 sm:py-4 lg:px-10">

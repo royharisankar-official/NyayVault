@@ -97,6 +97,21 @@ header. Every push to `main` automatically increments the patch version in
 `VERSION`; Render then deploys that version. Major and minor releases can be
 selected by updating the corresponding number in `VERSION` before pushing.
 
+### Hosted AI assistant
+
+The secure assistant uses NVIDIA NIM when `NVIDIA_API_KEY` is configured, with
+the `meta/llama-3.3-70b-instruct` model by default. Add `NVIDIA_API_KEY` as a
+secret in the Render service's Environment settings; optionally set
+`NVIDIA_MODEL` to another model enabled for that key. The key is used only by
+the backend and must never be placed in frontend code or committed files.
+Gemini remains a fallback when no NVIDIA key is configured.
+
+When a hosted model is enabled, the assistant sends the user's prompt and
+authorized retrieved document excerpts to that AI provider. Do not enable it
+for records that policy or consent prohibits processing by the provider.
+Retrieved excerpts are scoped to the signed-in user's existing document
+permissions, and generated case answers include supporting source references.
+
 For a Render Free web service, configure `DATABASE_URL` in the service's
 Environment settings to point to a durable external PostgreSQL database. The
 application accepts standard `postgresql://` connection URLs. The SQLite

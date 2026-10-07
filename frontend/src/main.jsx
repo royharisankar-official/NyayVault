@@ -60,7 +60,22 @@ async function request(path, options = {}) {
     throw new Error(`Unable to reach the ${PRODUCT_NAME} API. Start the backend on port 8000 and try again. (${error.message})`);
   }
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.detail || "Request failed");
+  if (!response.ok) {
+    const detail = data?.detail;
+    const message = typeof detail === "string"
+      ? detail
+      : Array.isArray(detail)
+        ? detail.map(item => {
+          const location = Array.isArray(item?.loc)
+            ? item.loc.filter(part => part !== "body").join(".")
+            : "";
+          return [location, item?.msg].filter(Boolean).join(": ");
+        }).filter(Boolean).join("; ")
+        : typeof detail?.message === "string"
+          ? detail.message
+          : `Request failed (${response.status})`;
+    throw new Error(message || `Request failed (${response.status})`);
+  }
   return removeDemoRecordLabel(data);
 }
 
@@ -1466,9 +1481,9 @@ function Intelligence({query, onSearch, runSearch, results, searchType, setSearc
     }
     finally { setAiBusy(false); }
   };
-  return <>  <PageTitle eyebrow="ASK" title="Grounded case intelligence" subtitle="Retrieve authorized evidence first, then analyze it with citations, verification flags and human-review safeguards."/>
+  return <>  <PageTitle eyebrow="ASK" title="NyayVault AI assistant" subtitle="Chat naturally, ask general questions, or get answers grounded in records you are authorized to access."/>
     <div className="rounded-3xl border border-electric/20 bg-gradient-to-br from-electric/10 via-panel to-panel p-6 sm:p-10">
-      <div className="mb-7 flex items-start gap-3"><div className="rounded-xl bg-electric/15 p-3 text-electric"><BrainCircuit size={25}/></div><div><h2 className="font-bold">How can I help?</h2><p className="mt-1 text-sm text-slate-400">Ask about legal procedures, case documents, evidence, filings or next steps.</p></div></div>
+      <div className="mb-7 flex items-start gap-3"><div className="rounded-xl bg-electric/15 p-3 text-electric"><BrainCircuit size={25}/></div><div><h2 className="font-bold">How can I help?</h2><p className="mt-1 text-sm text-slate-400">Chat freely, ask general questions, or ask about legal procedures, case documents, evidence, filings or next steps.</p></div></div>
       <p className="mb-5 text-xs leading-5 text-slate-500">When hosted AI is enabled, your question and authorized document excerpts are processed by the configured provider. NVIDIA NIM is preferred when enabled. Verify important information against the original records and official sources.</p>
       <div className="mb-6 flex flex-wrap items-center gap-3 text-xs text-slate-400"><label className="flex items-center gap-2">Answer language<select aria-label="Secure answer language" value={language} onChange={event => setLanguage(event.target.value)} className="rounded-lg border border-white/10 bg-ink px-3 py-2 text-xs text-slate-200 outline-none"><option>English</option><option>Hindi</option><option>Bengali</option><option>Marathi</option><option>Tamil</option><option>Telugu</option><option>Kannada</option><option>Malayalam</option><option>Urdu</option></select></label><span className="text-slate-600">Uses authorized records when available.</span>{chatMessages.length > 0 && <button type="button" onClick={() => {setChatMessages([]); setAiError("");}} className="ml-auto text-electric hover:text-white">Clear conversation</button>}</div>
       {chatMessages.length === 0 && <div className="mb-5"><div className="mb-2 text-xs font-semibold text-slate-400">Try asking</div><div className="grid gap-2 sm:grid-cols-2">{guidedQuestions.map(prompt => <button key={prompt} type="button" onClick={() => setQuestion(prompt)} className="rounded-xl border border-white/10 px-3 py-2 text-left text-[11px] leading-5 text-slate-400 transition hover:border-electric/40 hover:text-electric">{prompt}</button>)}</div></div>}

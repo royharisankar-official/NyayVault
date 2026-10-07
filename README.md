@@ -111,6 +111,8 @@ authorized retrieved document excerpts to that AI provider. Do not enable it
 for records that policy or consent prohibits processing by the provider.
 Retrieved excerpts are scoped to the signed-in user's existing document
 permissions, and generated case answers include supporting source references.
+The assistant can also answer general questions and chat normally; it uses
+retrieved records only when they are relevant to the user's question.
 
 For a Render Free web service, configure `DATABASE_URL` in the service's
 Environment settings to point to a durable external PostgreSQL database. The

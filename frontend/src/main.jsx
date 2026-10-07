@@ -1459,6 +1459,7 @@ function Intelligence({query, onSearch, runSearch, results, searchType, setSearc
       content: content.slice(0, 4000),
     }));
     setChatMessages(current => [...current, {role: "user", content: currentQuestion}].slice(-20));
+    setQuestion("");
     try {
       const body = {question: currentQuestion, language, plain_language: true, history};
       const result = await request("/ai/assistant", {
@@ -1475,9 +1476,9 @@ function Intelligence({query, onSearch, runSearch, results, searchType, setSearc
         generalGuidance: result.general_guidance,
         disclaimer: result.disclaimer,
       }].slice(-20));
-      setQuestion("");
     } catch (error) {
       setAiError(error.message);
+      setQuestion(current => current.trim() ? current : currentQuestion);
     }
     finally { setAiBusy(false); }
   };

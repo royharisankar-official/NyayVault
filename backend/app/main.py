@@ -644,6 +644,13 @@ async def health_check():
     return {"status": "healthy", "service": "dms-api", "capabilities": capabilities()}
 
 
+@app.get("/api/version")
+def application_version():
+    commit = os.environ.get("RENDER_GIT_COMMIT", "")
+    build = commit[:7] if re.fullmatch(r"[0-9a-fA-F]{7,40}", commit) else "local"
+    return {"version": app.version, "build": build}
+
+
 @app.get("/api/capabilities")
 def capability_status(user: User = Depends(current_user)):
     return capabilities()

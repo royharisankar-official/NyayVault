@@ -164,6 +164,7 @@ function App() {
   const [documentResults, setDocumentResults] = useState([]);
   const [intelligenceResults, setIntelligenceResults] = useState([]);
   const [toast, setToast] = useState("");
+  const [appVersion, setAppVersion] = useState("Version loading");
   const [showAuth, setShowAuth] = useState(() => !localStorage.getItem(tokenKey));
   const [showUpload, setShowUpload] = useState(false);
   const [showCreateCase, setShowCreateCase] = useState(false);
@@ -186,6 +187,26 @@ function App() {
   const [featureData, setFeatureData] = useState({});
   const searchTimers = useRef({});
   const searchVersions = useRef({documents: 0, intelligence: 0});
+  useEffect(() => {
+    let active = true;
+    fetch(`${API}/version`)
+      .then(async response => {
+        if (!response.ok) throw new Error(`Version request failed (${response.status})`);
+        const result = await response.json();
+        if (typeof result.version !== "string" || typeof result.build !== "string") {
+          throw new Error("Version response is missing its version or build identifier");
+        }
+        return result;
+      })
+      .then(result => {
+        if (active) setAppVersion(`v${result.version} · build ${result.build}`);
+      })
+      .catch(error => {
+        console.error("Application version could not be loaded:", error);
+        if (active) setAppVersion("Version unavailable");
+      });
+    return () => { active = false; };
+  }, []);
   useEffect(() => {
     document.documentElement.classList.toggle("light", theme === "light");
     localStorage.setItem("dms_theme", theme);
@@ -324,7 +345,7 @@ function App() {
     <div className="fixed inset-0 pointer-events-none grid-noise opacity-30" />
     <header className="sticky top-0 z-30 border-b border-white/10 bg-ink/85 backdrop-blur-xl">
       <div className="mx-auto flex max-w-[1500px] items-center justify-between px-4 py-3 sm:px-5 sm:py-4 lg:px-10">
-        <div className="flex min-w-0 items-center gap-3"><div className="brand-mark shrink-0"><img src="/static/lexora-logo.png" alt="NyayVault logo" /></div><div className="min-w-0"><div className="font-black tracking-tight">Nyay<span className="text-mint">Vault</span></div><div className="hidden text-[10px] uppercase tracking-[.24em] text-slate-500 sm:block">Secure case intelligence</div></div></div>
+        <div className="flex min-w-0 items-center gap-3"><div className="brand-mark shrink-0"><img src="/static/lexora-logo.png" alt="NyayVault logo" /></div><div className="min-w-0"><div className="font-black tracking-tight">Nyay<span className="text-mint">Vault</span></div><div className="hidden text-[10px] uppercase tracking-[.24em] text-slate-500 sm:block">Secure case intelligence</div><div className="max-w-[125px] truncate font-mono text-[8px] text-slate-500 sm:hidden">{appVersion}</div></div></div>
         <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[.04] px-3 py-2 text-xs text-slate-400 lg:flex"><span className="h-2 w-2 animate-pulse rounded-full bg-green-400 shadow-[0_0_12px_#4ade80]"/> All systems operational</div>
         <div className="flex shrink-0 items-center gap-2"><button aria-label="Toggle color theme" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="theme-toggle rounded-xl border border-white/10 p-2 text-slate-400 transition hover:border-mint/40 hover:text-mint">{theme === "dark" ? <Sun size={17}/> : <Moon size={17}/>}</button><button aria-label={mobileNav ? "Close workspace menu" : "Open workspace menu"} aria-expanded={mobileNav} onClick={() => setMobileNav(!mobileNav)} className="rounded-lg border border-white/10 p-2 lg:hidden"><Menu size={18}/></button><div className="hidden text-right sm:block"><div className="text-sm font-semibold">{user?.full_name || "Secure workspace"}</div><div className="text-xs text-slate-500">{user ? formatRoleLabel(user.role) : "authentication required"}</div></div><button onClick={logout} className="rounded-xl border border-white/10 p-2 text-slate-400 transition hover:border-red-300/40 hover:text-red-300"><LogOut size={17}/></button></div>
       </div>
@@ -351,7 +372,7 @@ function App() {
         {["collaboration", "public", "admin", "settings"].includes(view) && <FeatureHub kind={view} data={featureData[view]} load={() => loadFeature(view)} user={user} notify={notify} theme={theme} setTheme={setTheme} onNavigate={next => {setView(next); loadFeature(next);}}/>}
       </main>
     </div>
-    {showAuth && <Auth onDone={() => {setShowAuth(false);refresh()}} notify={notify}/>}
+    {showAuth && <Auth onDone={() => {setShowAuth(false);refresh()}} notify={notify} appVersion={appVersion}/>}
     {showUpload && <Upload onClose={() => setShowUpload(false)} onDone={() => {setShowUpload(false);refresh();notify("Document encrypted and secured")}}/>}
     {showCreateCase && <CreateCase onClose={() => setShowCreateCase(false)} onDone={() => {setShowCreateCase(false);refresh();notify("Case workspace created")}}/>}
     {toast && <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-xl border border-mint/30 bg-panel px-4 py-3 text-sm shadow-2xl"><CheckCircle2 size={16} className="text-mint"/>{toast}</div>}
@@ -1553,7 +1574,7 @@ function LoadingScreen() {
   </div>;
 }
 
-function Auth({onDone,notify}) {
+function Auth({onDone,notify,appVersion}) {
   const [register,setRegister] = useState(true);
   const [forgot,setForgot] = useState(false);
   const [loginMfaRequired, setLoginMfaRequired] = useState(false);
@@ -1658,7 +1679,7 @@ function Auth({onDone,notify}) {
           <div><span><Fingerprint size={16}/></span><div><strong>Chain of custody</strong><small>Hash-linked activity history for every action</small></div></div>
           <div><span><BrainCircuit size={16}/></span><div><strong>Intelligence at speed</strong><small>OCR and semantic search across your vault</small></div></div>
         </div>
-        <div className="auth-story-footer"><span className="auth-check"><CheckCircle2 size={14}/> Integrity monitor active</span><span className="auth-mono">NYAYVAULT / 01</span></div>
+        <div className="auth-story-footer"><span className="auth-check"><CheckCircle2 size={14}/> Integrity monitor active</span><span className="auth-mono">NYAYVAULT / {appVersion}</span></div>
       </section>
       <section className="auth-card">
         <div className="auth-card-top"><div className="auth-card-icon"><KeyRound size={19}/></div><div><div className="font-bold">Secure access</div><div className="text-xs text-slate-500">{PRODUCT_NAME} workspace</div></div><div className="auth-lock"><FileLock2 size={15}/></div></div>
@@ -1690,6 +1711,7 @@ function Auth({onDone,notify}) {
         {authError && <div role="alert" className="mt-3 rounded-xl border border-red-300/20 bg-red-400/10 px-3 py-2 text-xs text-red-200">{authError}</div>}
         <div className="auth-note"><ShieldCheck size={14}/> Your session is protected with role-based access control.</div>
         {forgot ? <button type="button" onClick={() => { setForgot(false); setResetToken(""); setAuthError(""); }} className="auth-switch">Back to sign in <ChevronRight size={13}/></button> : <>{!register && <button type="button" onClick={() => { setForgot(true); setAuthError(""); }} className="auth-switch">Forgot password? <ChevronRight size={13}/></button>}<button type="button" onClick={() => { setRegister(!register); setLoginMfaRequired(false); setAuthError(""); }} className="auth-switch">{register ? "I already have an account" : "Create a new account"} <ChevronRight size={13}/></button></>}
+        <div className="auth-version"><span>APPLICATION VERSION</span><strong>{appVersion}</strong></div>
       </section>
     </div>
   </div>;

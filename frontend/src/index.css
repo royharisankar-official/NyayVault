@@ -102,6 +102,8 @@ option { color: #e8f0fb; background-color: #0d1b2e; }
 .auth-note { display: flex; align-items: center; gap: 7px; margin-top: 17px; color: #71889e; font-size: 10px; line-height: 1.4; }
 .auth-note svg { flex: 0 0 auto; color: #56e0bd; }
 .auth-switch { display: inline-flex; align-items: center; gap: 3px; margin-top: 20px; padding: 0; border: 0; color: #56e0bd; background: transparent; font-size: 11px; }
+.auth-version { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; margin-top: 18px; padding-top: 13px; border-top: 1px solid rgba(255,255,255,.1); color: #71889e; font-family: "DM Mono", ui-monospace, monospace; font-size: 9px; letter-spacing: .08em; }
+.auth-version strong { color: #9eb0c3; font-weight: 500; text-align: right; }
 .brand-mark { display: grid; place-items: center; width: 44px; height: 44px; overflow: hidden; border: 1px solid rgba(86,224,189,.35); border-radius: 15px; background: rgba(255,255,255,.96); box-shadow: 0 0 18px rgba(86,224,189,.2), 0 8px 28px rgba(0,0,0,.24); }
 .brand-mark img { position: relative; left: 1px; width: 38px; height: 38px; object-fit: contain; }
 
@@ -223,6 +225,8 @@ option { color: #e8f0fb; background-color: #0d1b2e; }
 .light .auth-feature-list small, .light .auth-story-footer { color: #718198; }
 .light .auth-card { border-color: rgba(42,73,96,.14); background: rgba(255,255,255,.86); box-shadow: 0 28px 70px rgba(40,67,92,.14); }
 .light .auth-card-copy, .light .auth-note { color: #586a82; }
+.light .auth-version { border-color: rgba(42,73,96,.14); color: #718198; }
+.light .auth-version strong { color: #586a82; }
 .light .auth-form label { color: #586a82; }
 .light .auth-form input { color: #17243a; border-color: rgba(42,73,96,.16); background: #f5f9fa; }
 .light .auth-form input::placeholder { color: #8290a2; }

@@ -93,7 +93,9 @@ The image builds the Vite frontend inside Docker, so a local `frontend\dist`
 folder is not required in Git. The service listens on Render's `PORT`
 environment variable and uses `/health` for health checks.
 The application displays its release version in the sign-in screen and app
-header.
+header. Every push to `main` automatically increments the patch version in
+`VERSION`; Render then deploys that version. Major and minor releases can be
+selected by updating the corresponding number in `VERSION` before pushing.
 
 For a Render Free web service, configure `DATABASE_URL` in the service's
 Environment settings to point to a durable external PostgreSQL database. The

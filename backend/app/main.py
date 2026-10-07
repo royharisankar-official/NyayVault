@@ -189,10 +189,15 @@ if engine.url.get_backend_name() == "sqlite":
             if name not in case_columns:
                 connection.execute(text(f"ALTER TABLE cases ADD COLUMN {name} {definition}"))
 
+version_file = Path(__file__).resolve().parents[2] / "VERSION"
+app_version = version_file.read_text(encoding="ascii").strip()
+if not re.fullmatch(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", app_version):
+    raise RuntimeError(f"Invalid application version in {version_file}: {app_version!r}")
+
 app = FastAPI(
     title="Secure Digital Document Management System",
     description="NyayVault - secure case intelligence for legal and investigation documents",
-    version="1.0.0",
+    version=app_version,
 )
 app.add_middleware(
     CORSMiddleware,

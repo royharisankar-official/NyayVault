@@ -9,6 +9,7 @@ RUN npm run build
 FROM python:3.12-slim
 
 WORKDIR /app
+COPY VERSION ./VERSION
 COPY backend/requirements.txt ./backend/requirements.txt
 COPY backend/requirements-optional.txt ./backend/requirements-optional.txt
 RUN apt-get update \

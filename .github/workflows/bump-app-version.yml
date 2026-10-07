@@ -1,0 +1,47 @@
+name: Bump application version
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bump-app-version-main
+  cancel-in-progress: false
+
+jobs:
+  bump-patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the latest main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Increment patch version
+        id: version
+        shell: bash
+        run: |
+          current="$(cat VERSION)"
+          if [[ ! "$current" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "VERSION must contain a valid MAJOR.MINOR.PATCH value; got: $current" >&2
+            exit 1
+          fi
+          major="${BASH_REMATCH[1]}"
+          minor="${BASH_REMATCH[2]}"
+          patch="${BASH_REMATCH[3]}"
+          next="$major.$minor.$((patch + 1))"
+          printf '%s\n' "$next" > VERSION
+          echo "value=$next" >> "$GITHUB_OUTPUT"
+
+      - name: Commit updated version
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add VERSION
+          git commit -m "chore: bump application version to v${{ steps.version.outputs.value }}"
+          git push origin main

@@ -193,13 +193,13 @@ function App() {
       .then(async response => {
         if (!response.ok) throw new Error(`Version request failed (${response.status})`);
         const result = await response.json();
-        if (typeof result.version !== "string" || typeof result.build !== "string") {
-          throw new Error("Version response is missing its version or build identifier");
+        if (typeof result.version !== "string") {
+          throw new Error("Version response is missing its version");
         }
         return result;
       })
       .then(result => {
-        if (active) setAppVersion(`v${result.version} · build ${result.build}`);
+        if (active) setAppVersion(`v${result.version}`);
       })
       .catch(error => {
         console.error("Application version could not be loaded:", error);

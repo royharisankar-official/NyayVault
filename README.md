@@ -92,9 +92,8 @@ This repository includes a `render.yaml` Blueprint and a production Dockerfile.
 The image builds the Vite frontend inside Docker, so a local `frontend\dist`
 folder is not required in Git. The service listens on Render's `PORT`
 environment variable and uses `/health` for health checks.
-The application displays its release version and the short Git commit used to
-build the deployment; the build identifier updates automatically with each
-new commit deployed to Render.
+The application displays its release version in the sign-in screen and app
+header.
 
 For a Render Free web service, configure `DATABASE_URL` in the service's
 Environment settings to point to a durable external PostgreSQL database. The

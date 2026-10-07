@@ -94,8 +94,9 @@ folder is not required in Git. The service listens on Render's `PORT`
 environment variable and uses `/health` for health checks.
 The application displays its release version in the sign-in screen and app
 header. Every push to `main` automatically increments the patch version in
-`VERSION`; Render then deploys that version. Major and minor releases can be
-selected by updating the corresponding number in `VERSION` before pushing.
+`VERSION`; Render then deploys that version. To make a major or minor release,
+update `VERSION` to the desired release before pushing; the workflow preserves
+that manually selected version instead of adding another patch number.
 
 ### Hosted AI assistant
 

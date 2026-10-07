@@ -22,9 +22,11 @@ jobs:
         with:
           ref: main
 
-      - name: Increment patch version
+      - name: Select application version
         id: version
         shell: bash
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
         run: |
           current="$(cat VERSION)"
           if [[ ! "$current" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
@@ -34,11 +36,18 @@ jobs:
           major="${BASH_REMATCH[1]}"
           minor="${BASH_REMATCH[2]}"
           patch="${BASH_REMATCH[3]}"
-          next="$major.$minor.$((patch + 1))"
-          printf '%s\n' "$next" > VERSION
+          if git diff --quiet "$BEFORE_SHA" HEAD -- VERSION; then
+            next="$major.$minor.$((patch + 1))"
+            printf '%s\n' "$next" > VERSION
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            next="$current"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
           echo "value=$next" >> "$GITHUB_OUTPUT"
 
       - name: Commit updated version
+        if: steps.version.outputs.changed == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

@@ -352,7 +352,7 @@ function App() {
     </header>
     <div className="workspace-frame mx-auto flex w-full max-w-[1500px]">
       {mobileNav && <button type="button" aria-label="Close workspace menu" onClick={() => setMobileNav(false)} className="fixed inset-x-0 bottom-0 top-16 z-10 bg-black/45 lg:hidden"/>}
-      <aside className={`${mobileNav ? "fixed inset-x-4 top-20 z-20 flex" : "hidden"} h-[calc(100dvh-6rem)] w-64 shrink-0 flex-col gap-4 lg:sticky lg:top-0 lg:flex lg:h-full lg:self-start`}>
+      <aside className={`${mobileNav ? "fixed inset-x-4 top-20 z-20 flex" : "hidden"} h-[calc(100dvh-6rem)] w-64 shrink-0 flex-col gap-4 lg:sticky lg:top-24 lg:flex lg:h-[calc(100dvh-7rem)] lg:self-start`}>
         <section aria-label="Workspace navigation" className="workspace-navigation-card min-h-0 flex-1 overflow-y-auto rounded-2xl border border-white/10 bg-panel p-3 shadow-2xl">
           <div className="mb-7 px-3 pt-3 text-[10px] font-bold uppercase tracking-[.22em] text-slate-500">Workspace</div>
           <nav className="workspace-nav space-y-1">{nav.map(({id,label,icon: Icon}) => <button key={id} onClick={() => {if (id === "document-viewer") setSelectedDocument(null); setView(id); if (id === "settings") loadFeature("settings"); setMobileNav(false)}} className={`workspace-nav-item flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${view === id ? "bg-mint font-semibold text-ink shadow-lg shadow-mint/10" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}><Icon size={17}/>{label}{view === id && <ChevronRight size={15} className="ml-auto"/>}</button>)}</nav>

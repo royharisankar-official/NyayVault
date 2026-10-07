@@ -6,6 +6,9 @@
 :root { color-scheme: dark; font-family: "Space Grotesk", "Avenir Next", ui-sans-serif, system-ui, sans-serif; color: #e8f0fb; background: #07111f; }
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; overflow-x: hidden; background: radial-gradient(circle at 80% -10%, #173557 0, #07111f 42%); transition: background .5s ease, color .5s ease; }
+.app-shell { display: flex; height: 100dvh; flex-direction: column; overflow: hidden; }
+.workspace-frame { min-height: 0; flex: 1; overflow: hidden; }
+.workspace-main { height: 100%; overflow-y: auto; overscroll-behavior: contain; }
 button, input { font: inherit; }
 button { cursor: pointer; }
 select { color: #e8f0fb; background-color: #0d1b2e; }

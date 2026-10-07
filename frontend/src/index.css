@@ -3,7 +3,7 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { font-family: "Space Grotesk", "Avenir Next", ui-sans-serif, system-ui, sans-serif; color: #e8f0fb; background: #07111f; }
+:root { color-scheme: dark; font-family: "Space Grotesk", "Avenir Next", ui-sans-serif, system-ui, sans-serif; color: #e8f0fb; background: #07111f; }
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; overflow-x: hidden; background: radial-gradient(circle at 80% -10%, #173557 0, #07111f 42%); transition: background .5s ease, color .5s ease; }
 button, input { font: inherit; }
@@ -229,7 +229,7 @@ option { color: #e8f0fb; background-color: #0d1b2e; }
 .light .auth-form select { color: #17243a; border-color: rgba(42,73,96,.32); background-color: #fff; }
 .light .auth-form select:focus { border-color: rgba(22,143,120,.7); box-shadow: 0 0 0 3px rgba(22,143,120,.12); }
 @media (max-width: 760px) {
-  .auth-shell { padding: 20px; overflow-x: hidden; background: radial-gradient(circle at 12% 12%, #d8f4ef 0, #eef4f7 48%, #dceaf1 100%); }
+  .auth-shell { padding: 20px; overflow-x: hidden; }
   .auth-ambient-one { width: 300px; height: 300px; top: -110px; left: -120px; opacity: .9; }
   .auth-ambient-two { width: 260px; height: 260px; right: -100px; bottom: -80px; opacity: .85; }
   .auth-layout { grid-template-columns: 1fr; gap: 24px; max-width: 480px; }

@@ -102,7 +102,7 @@ that manually selected version instead of adding another patch number.
 
 The secure assistant uses NVIDIA NIM when `NVIDIA_API_KEY` is configured.
 Add the key as a secret in the Render service's Environment settings. The
-default NVIDIA model is `nvidia/nemotron-3.5-lightning-30b-a3b`; set
+default NVIDIA model is `nvidia/nemotron-3-ultra-550b-a55b`; set
 `NVIDIA_MODEL` to another model enabled for your key if needed. The key is
 used only by the backend and must never be placed in frontend code or committed
 files.

@@ -17,7 +17,7 @@ class Settings(BaseModel):
     HF_TOKEN: str | None = os.getenv("HF_TOKEN")
     NVIDIA_API_KEY: str | None = os.getenv("NVIDIA_API_KEY")
     NVIDIA_MODEL: str = os.getenv(
-        "NVIDIA_MODEL", "nvidia/nemotron-3.5-lightning-30b-a3b"
+        "NVIDIA_MODEL", "nvidia/nemotron-3-ultra-550b-a55b"
     )
     BASE_DIR: Path = BASE_DIR
 

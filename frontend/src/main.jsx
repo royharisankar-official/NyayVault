@@ -248,7 +248,11 @@ function App() {
     const version = ++searchVersions.current[scope];
     setQuery(value);
     if (searchTimers.current[scope]) window.clearTimeout(searchTimers.current[scope]);
-    if (!value.trim() && !type && !Object.values(filters).some(item => String(item || "").trim())) return setResults([]);
+    if (!value.trim() && !type && !Object.values(filters).some(item => String(item || "").trim())) {
+      setResults([]);
+      setSearchLoading(false);
+      return;
+    }
     setSearchLoading(true);
     searchTimers.current[scope] = window.setTimeout(async () => {
       try {
@@ -260,7 +264,7 @@ function App() {
         if (searchVersions.current[scope] !== version) return;
         const results = payload.results || [];
         const hasFilters = Boolean(type) || Object.values(filters).some(item => String(item || "").trim());
-        setResults(results.length || hasFilters || !value.trim() ? results : [{
+        setResults(scope === "intelligence" || results.length || hasFilters || !value.trim() ? results : [{
           id: "demo-search-result",
           title: "Public evidence index · no matching workspace record",
           document_type: type || "guidance",
@@ -353,7 +357,7 @@ function App() {
         {view === "overview" && <Overview data={data} onUpload={() => setShowUpload(true)} onCreateCase={() => setShowCreateCase(true)} setView={setView}/>}
         {view === "documents" && <Documents documents={documents} query={documentQuery} onSearch={documentSearch} runSearch={(value, type = documentType, filters = documentFilters) => runSearch("documents", value, type, filters)} filters={documentFilters} setFilters={setDocumentFilters} onUpload={() => setShowUpload(true)} onOpenDocument={(document) => { setSelectedDocument(document); setView("document-viewer"); }} searchResults={documentResults} searchType={documentType} setSearchType={setDocumentType} searchLoading={searchLoading}/>}
         {view === "document-viewer" && <DocumentViewer document={selectedDocument} onBack={() => setView("documents")} onReset={() => setSelectedDocument(null)} onUpload={() => setShowUpload(true)}/>}
-        {view === "intelligence" && <Intelligence query={intelligenceQuery} onSearch={intelligenceSearch} runSearch={(value, type = intelligenceType) => runSearch("intelligence", value, type)} results={intelligenceResults} searchType={intelligenceType} setSearchType={setIntelligenceType} searchLoading={searchLoading}/>}
+        {view === "intelligence" && <Intelligence query={intelligenceQuery} onSearch={intelligenceSearch} runSearch={(value, type = intelligenceType) => runSearch("intelligence", value, type)} results={intelligenceResults} searchType={intelligenceType} setSearchType={setIntelligenceType} searchLoading={searchLoading} documents={documents} onOpenDocument={documentId => { const document = documents.find(item => String(item.id) === String(documentId)); if (document) { setSelectedDocument(document); setView("document-viewer"); } else { setView("documents"); } }}/>}
         {view === "audit" && <Audit data={data} notify={notify} refresh={refresh}/>}
         {view === "database" && <SystemPage kind="database" system={system}/>}
         {view === "docker" && <SystemPage kind="docker" system={system}/>}
@@ -1442,15 +1446,41 @@ function DocumentViewer({document, onBack, onReset, onUpload}) {
   return <><PageTitle eyebrow="DOCUMENT VIEWER" title={document.title} subtitle="Preview + metadata + SHA-256 + blockchain verification + signature status." action={<div className="flex flex-wrap gap-2"><button onClick={onReset} className="rounded-xl border border-mint/25 px-4 py-2.5 text-sm font-semibold text-mint hover:bg-mint/10">Home</button><button onClick={onBack} className="rounded-xl border border-white/10 px-4 py-2.5 text-sm font-semibold text-slate-300">Back to vault</button></div>}/><div className="grid gap-5 xl:grid-cols-[1.35fr_.65fr]"><section className="rounded-2xl border border-white/10 bg-panel/70 p-5"><div className="mb-4 flex items-center justify-between"><h2 className="font-bold">Secure preview</h2><button onClick={loadPreview} disabled={previewLoading} className="rounded-lg bg-mint px-3 py-2 text-xs font-bold text-ink">{previewLoading ? "Verifying…" : "Load preview"}</button></div>{previewUrl && canEmbed ? <iframe title="Secure document preview" src={previewUrl} className="h-[430px] w-full rounded-xl bg-white"/> : <div className="flex min-h-[390px] items-center justify-center rounded-xl border border-dashed border-white/10 bg-white/[.02] p-8 text-center"><div><div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-mint/10 text-mint"><FileText size={38}/></div><h2 className="mt-5 text-lg font-bold">{document.filename}</h2><p className="mt-2 max-w-md text-sm leading-6 text-slate-500">{previewUrl ? "This file type is securely verified but does not support embedded browser preview." : "Load preview to decrypt, verify and display this protected record."}</p></div></div>}</section><section className="space-y-4"><div className="rounded-2xl border border-white/10 bg-panel/70 p-5"><h2 className="mb-4 font-bold">Document metadata</h2><div className="space-y-3 text-sm">{[["Type", document.document_type], ["Sensitivity", document.sensitivity || "confidential"], ["Version", `v${document.version}`], ["Uploaded", document.created_at ? new Date(document.created_at).toLocaleString() : "Unknown"], ["Case", document.case_id || "Unassigned"], ["Storage", document.storage_provider || "local encrypted storage"]].map(([label,value]) => <div key={label} className="flex justify-between gap-3 border-b border-white/5 pb-2"><span className="text-slate-500">{label}</span><span className="max-w-[220px] text-right font-medium">{value}</span></div>)}</div></div><div className="rounded-2xl border border-mint/20 bg-mint/5 p-5"><div className="mb-4 flex items-center justify-between"><h2 className="font-bold text-mint">Verification status</h2><button onClick={loadVerification} className="text-xs text-mint">Recheck</button></div>{verification?.error ? <p className="text-xs text-red-300">{verification.error}</p> : <div className="space-y-3 text-sm"><div className="flex justify-between gap-3"><span className="text-slate-500">SHA-256</span><span className={verification?.sha256?.valid ? "text-mint" : "text-amber-300"}>{verification?.sha256?.valid ? "Verified" : "Checking…"}</span></div><div className="truncate font-mono text-[10px] text-slate-500">{verification?.sha256?.calculated || document.sha256 || "Pending"}</div><div className="flex justify-between"><span className="text-slate-500">Blockchain</span><span className="text-electric">{verification?.blockchain?.anchored ? "Anchored" : "Anchor pending"}</span></div><div className="text-[10px] text-slate-500">{verification?.blockchain?.transaction_id || "No transaction anchor yet"}</div><div className="flex justify-between"><span className="text-slate-500">Digital signature</span><span className={verification?.signature?.valid ? "text-mint" : "text-amber-300"}>{verification?.signature?.valid ? "Ed25519 verified" : "Checking…"}</span></div></div>}</div></section></div></>;
 }
 
-function Intelligence({query, onSearch, runSearch, results, searchType, setSearchType, searchLoading}) {
-  const suggestions = ["witness statement about vehicle identification", "forensic report with DNA evidence", "FIR mentioning financial fraud", "court filing with urgent notice"];
+function Intelligence({query, onSearch, runSearch, results, searchType, setSearchType, searchLoading, documents, onOpenDocument}) {
+  const suggestions = [
+    {label: "Witness statement", query: "witness statement"},
+    {label: "Forensic report", query: "forensic report"},
+    {label: "FIR about financial fraud", query: "FIR financial fraud"},
+    {label: "Urgent court filing", query: "urgent court filing"},
+  ];
+  const documentTypes = [
+    {value: "", label: "All records"},
+    {value: "fir", label: "FIR"},
+    {value: "charge_sheet", label: "Charge sheet"},
+    {value: "witness", label: "Witness statement"},
+    {value: "evidence", label: "Evidence"},
+    {value: "forensic", label: "Forensic report"},
+    {value: "court_filing", label: "Court filing"},
+    {value: "judgment", label: "Judgment"},
+  ];
   const [recent, setRecent] = useState(() => JSON.parse(localStorage.getItem("dms_recent_searches") || "[]"));
   const [question, setQuestion] = useState("");
   const [language, setLanguage] = useState("English");
   const [chatMessages, setChatMessages] = useState([]);
   const [aiError, setAiError] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
-  const submit = (event) => { event.preventDefault(); if (!query.trim()) return; const next = [query, ...recent.filter(item => item !== query)].slice(0,5); setRecent(next); localStorage.setItem("dms_recent_searches", JSON.stringify(next)); runSearch(query); };
+  const rememberSearch = (value) => {
+    const next = [value, ...recent.filter(item => item !== value)].slice(0, 5);
+    setRecent(next);
+    localStorage.setItem("dms_recent_searches", JSON.stringify(next));
+  };
+  const submit = (event) => {
+    event.preventDefault();
+    const search = query.trim();
+    if (!search) return;
+    rememberSearch(search);
+    runSearch(search, searchType);
+  };
   const runAiTool = async (event) => {
     event?.preventDefault();
     const currentQuestion = question.trim();
@@ -1495,15 +1525,63 @@ function Intelligence({query, onSearch, runSearch, results, searchType, setSearc
       {aiError && <div role="alert" className="mb-5 rounded-xl border border-red-300/20 bg-red-300/5 p-4 text-sm text-red-200">{aiError}</div>}
       <form onSubmit={runAiTool} className="mb-4 flex flex-col gap-3 sm:flex-row"><div className="flex min-w-0 flex-1 items-center gap-3 rounded-xl border border-white/10 bg-ink/50 px-4 py-3"><textarea value={question} onChange={event => setQuestion(event.target.value)} onKeyDown={event => {if (event.key === "Enter" && !event.shiftKey) {event.preventDefault(); runAiTool(event);}}} maxLength={2000} rows={2} placeholder="Message NyayVault AI…" className="w-full resize-y bg-transparent outline-none placeholder:text-slate-600"/></div><button disabled={aiBusy || !question.trim()} className="rounded-xl bg-electric px-5 py-3 text-sm font-bold text-ink disabled:cursor-wait disabled:opacity-50">{aiBusy ? "Thinking…" : "Send"}</button></form>
       <section className="mt-8 rounded-2xl border border-white/10 bg-ink/30 p-4 sm:mt-10 sm:p-6">
-        <div className="mb-5 border-b border-white/10 pb-4">
-          <h2 className="font-bold">Search the evidence vault</h2>
-          <p className="mt-1 text-xs leading-5 text-slate-500">Find authorized records separately from your AI conversation.</p>
+        <div className="mb-5">
+          <h2 className="font-bold">Find a document</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-500">Search the titles and text of records you’re allowed to access. Try a name, case number, or a few words from the document.</p>
         </div>
-        <form onSubmit={submit} className="flex flex-col gap-3 sm:flex-row"><div className="flex flex-1 items-center gap-3 rounded-xl border border-white/10 bg-panel/70 px-4 py-4"><Search size={18} className="text-slate-500"/><input value={query} onChange={onSearch} placeholder="What are you looking for?" className="w-full bg-transparent outline-none placeholder:text-slate-600"/>{searchLoading && <span className="text-xs text-electric">Working…</span>}</div><button className="rounded-xl bg-electric px-5 py-3 text-sm font-bold text-ink">Search evidence</button></form>
-        <div className="mt-5 flex flex-wrap gap-2">{suggestions.map(item => <button key={item} onClick={() => {setRecent([item, ...recent.filter(value => value !== item)].slice(0,5)); runSearch(item);}} className="rounded-full border border-white/10 px-3 py-2 text-xs text-slate-400 transition hover:border-electric hover:bg-electric hover:text-ink focus-visible:border-electric focus-visible:bg-electric focus-visible:text-ink focus-visible:outline-none">{item}</button>)}</div>
-        <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-white/10 pt-5"><span className="mr-1 text-[10px] uppercase tracking-widest text-slate-500">Type</span>{["", "fir", "charge_sheet", "witness", "evidence", "forensic", "court_filing", "judgment"].map(type => <button key={type} onClick={() => {setSearchType(type); if (query) runSearch(query, type)}} className={`rounded-lg px-2.5 py-1.5 text-xs ${searchType === type ? "bg-electric/15 text-electric" : "text-slate-500 hover:bg-white/5"}`}>{type || "All"}</button>)}</div>
-        {recent.length > 0 && <div className="mt-6 border-t border-white/10 pt-5"><div className="mb-3 text-[10px] uppercase tracking-widest text-slate-500">Recent searches</div><div className="flex flex-wrap gap-2">{recent.map(item => <button key={item} onClick={() => runSearch(item)} className="flex items-center gap-1 rounded-lg bg-white/[.04] px-3 py-2 text-xs text-slate-400 transition hover:bg-electric hover:text-ink focus-visible:bg-electric focus-visible:text-ink focus-visible:outline-none"><Search size={11}/>{item}</button>)}</div></div>}
-        {results.length ? <div className="mt-7 space-y-3 border-t border-white/10 pt-5"><div className="flex items-center justify-between"><h3 className="font-semibold">Ranked evidence</h3><span className="text-xs text-slate-500">{results.length} result{results.length === 1 ? "" : "s"}</span></div>{results.map(item => <div key={item.id} className="rounded-xl border border-white/5 bg-white/[.03] p-4"><div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2"><FileText size={16} className="text-electric"/><div className="font-semibold">{item.title}</div><span className="rounded bg-white/5 px-2 py-0.5 text-[10px] uppercase text-slate-500">{item.document_type}</span>{item.demo && <span className="rounded bg-amber-300/10 px-2 py-0.5 text-[10px] uppercase text-amber-300">Source-assisted</span>}</div><p className="mt-2 text-xs leading-5 text-slate-400">{item.snippet || item.filename}</p>{item.matched_terms?.length > 0 && <div className="mt-2 text-[11px] text-mint">Matched: {item.matched_terms.join(", ")}</div>}</div><div className="shrink-0 text-right"><div className="text-lg font-bold text-electric">{Math.round(item.score * 100)}%</div><div className="text-[10px] text-slate-500">relevance</div></div></div></div>)}</div> : <div className="mt-7 grid gap-3 border-t border-white/10 pt-5 sm:grid-cols-3"><MiniFeature icon={Sparkles} label="OCR-aware" text="Search text extracted from images."/><MiniFeature icon={Zap} label="Explainable" text="See matched terms and relevance."/><MiniFeature icon={Orbit} label="Local-first" text="Keep sensitive evidence in your workspace."/></div>}
+        <form onSubmit={submit} className="flex flex-col gap-3 sm:flex-row">
+          <div className="flex min-w-0 flex-1 items-center gap-3 rounded-xl border border-white/10 bg-panel/70 px-4 py-3">
+            <Search size={18} className="shrink-0 text-slate-500"/>
+            <input value={query} onChange={onSearch} aria-label="Search document titles and text" placeholder="e.g. witness statement, case number, or a person's name" className="w-full bg-transparent py-1 outline-none placeholder:text-slate-500"/>
+          </div>
+          <button disabled={!query.trim() || searchLoading} className="flex items-center justify-center gap-2 rounded-xl bg-electric px-5 py-3 text-sm font-bold text-ink disabled:cursor-not-allowed disabled:opacity-50">
+            <Search size={16}/>{searchLoading ? "Searching…" : "Search records"}
+          </button>
+        </form>
+        <p className="mt-2 text-xs text-slate-500">Only records available to your account appear in search.</p>
+
+        {!query && results.length === 0 && <div className="mt-5">
+          <div className="mb-2 text-xs font-semibold text-slate-400">Try a search</div>
+          <div className="flex flex-wrap gap-2">{suggestions.map(item => <button key={item.query} type="button" onClick={() => { rememberSearch(item.query); runSearch(item.query, searchType); }} className="rounded-full border border-white/10 px-3 py-2 text-xs text-slate-400 transition hover:border-electric/50 hover:text-electric">{item.label}</button>)}</div>
+        </div>}
+
+        <div className="mt-5 border-t border-white/10 pt-4">
+          <div className="mb-2 text-xs font-semibold text-slate-400">Narrow by document type</div>
+          <div className="flex flex-wrap gap-2">{documentTypes.map(type => <button key={type.value || "all"} type="button" aria-pressed={searchType === type.value} onClick={() => { setSearchType(type.value); runSearch(query.trim(), type.value); }} className={`rounded-lg border px-3 py-2 text-xs transition ${searchType === type.value ? "border-electric/40 bg-electric/10 font-semibold text-electric" : "border-white/10 text-slate-400 hover:border-white/20 hover:text-slate-200"}`}>{type.label}</button>)}</div>
+        </div>
+
+        {recent.length > 0 && <div className="mt-5 border-t border-white/10 pt-4">
+          <div className="mb-3 flex items-center justify-between gap-3"><h3 className="text-xs font-semibold text-slate-400">Recent searches</h3><button type="button" onClick={() => { setRecent([]); localStorage.removeItem("dms_recent_searches"); }} className="text-xs text-slate-500 hover:text-slate-300">Clear history</button></div>
+          <div className="flex flex-wrap gap-2">{recent.map(item => <button key={item} type="button" onClick={() => { runSearch(item, searchType); }} className="rounded-lg bg-white/[.04] px-3 py-2 text-xs text-slate-400 transition hover:bg-white/[.08] hover:text-slate-200">{item}</button>)}</div>
+        </div>}
+
+        {searchLoading ? <div role="status" className="mt-5 border-t border-white/10 pt-5 text-sm text-slate-400">Searching your records…</div> : results.length > 0 ? <div className="mt-5 space-y-3 border-t border-white/10 pt-5">
+          <div className="flex items-center justify-between"><h3 className="font-semibold">Search results</h3><span className="text-xs text-slate-500">{results.length} record{results.length === 1 ? "" : "s"}</span></div>
+          {results.map(item => {
+            if (item.demo) return <div key={item.id} role="status" className="rounded-xl border border-amber-300/20 bg-amber-300/5 p-4">
+              <h4 className="font-semibold text-amber-300">{item.title === "Evidence search needs attention" ? "Search needs attention" : item.title === "Source-assisted evidence guidance" ? "Search service unavailable" : "No matching records found"}</h4>
+              <p className="mt-1 text-sm leading-6 text-slate-400">{item.snippet}</p>
+            </div>;
+            const document = documents.find(record => String(record.id) === String(item.id));
+            const typeLabel = item.document_type === "fir" ? "FIR" : formatRoleLabel(item.document_type);
+            return <article key={item.id} className="rounded-xl border border-white/10 bg-white/[.03] p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2"><FileText size={16} className="shrink-0 text-electric"/><h4 className="font-semibold">{item.title}</h4><span className="rounded-full bg-white/[.06] px-2.5 py-1 text-[10px] text-slate-400">{typeLabel}</span></div>
+                  {(item.fir_number || item.filename) && <p className="mt-2 text-xs text-slate-500">{item.fir_number ? `Case ${item.fir_number}` : item.filename}</p>}
+                  {item.snippet && <p className="mt-3 text-sm leading-6 text-slate-400">{item.snippet}</p>}
+                  {item.matched_terms?.length > 0 && <p className="mt-2 text-xs text-slate-500">Matching words: <span className="text-mint">{item.matched_terms.join(", ")}</span></p>}
+                </div>
+                {document && <button type="button" onClick={() => onOpenDocument(item.id)} className="flex shrink-0 items-center justify-center gap-2 rounded-lg border border-electric/30 px-3 py-2 text-xs font-semibold text-electric transition hover:bg-electric/10">Open record <ArrowUpRight size={14}/></button>}
+              </div>
+            </article>;
+          })}
+        </div> : query.trim() || searchType ? <div className="mt-5 rounded-xl border border-white/10 bg-white/[.03] p-5">
+          <h3 className="font-semibold">No matching records found</h3>
+          <p className="mt-1 text-sm leading-6 text-slate-400">Try a shorter phrase, check the spelling, or choose “All records” to broaden your search.</p>
+        </div> : <div className="mt-5 rounded-xl border border-dashed border-white/10 bg-white/[.02] p-5 text-sm leading-6 text-slate-500">
+          Your search results will appear here. Enter a few words above or choose a document type to get started.
+        </div>}
       </section>
     </div></>;
 }

@@ -1628,7 +1628,7 @@ def rag_legal_qa(request: AiQuestionRequest, db: Session = Depends(get_db),
     )
     if not sources:
         provider = "general-guidance-fallback"
-        if settings.NVIDIA_API_KEY or settings.GEMINI_API_KEY:
+        if settings.NVIDIA_API_KEY:
             try:
                 answer, provider = generate_ai_text(
                     f"{conversation}Question: {request.question}",
@@ -1676,7 +1676,7 @@ def rag_legal_qa(request: AiQuestionRequest, db: Session = Depends(get_db),
                            for index, item in enumerate(ranked))
     answer = ""
     provider = "grounded-extractive"
-    if settings.NVIDIA_API_KEY or settings.GEMINI_API_KEY:
+    if settings.NVIDIA_API_KEY:
         try:
             answer, provider = generate_ai_text(
                 f"{conversation}Question: {request.question}\n\nAuthorized sources:\n{combined}",
@@ -1915,7 +1915,6 @@ def summarize_document(document_id: int, db: Session = Depends(get_db),
 
 
 @app.post("/api/documents/{document_id}/summarize/ai")
-@app.post("/api/documents/{document_id}/summarize/gemini")
 def summarize_document_with_ai(document_id: int, db: Session = Depends(get_db),
                                user: User = Depends(current_user)):
     document = db.get(Document, document_id)

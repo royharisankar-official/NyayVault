@@ -100,16 +100,12 @@ that manually selected version instead of adding another patch number.
 
 ### Hosted AI assistant
 
-The secure assistant uses NVIDIA NIM and/or Gemini when their API keys are
-configured. When both are available, NyayVault sends the same prompt and
-authorized document excerpts to both and returns the first successful answer;
-this can improve response time but can increase provider usage and sends those
-excerpts to each configured provider. Add `NVIDIA_API_KEY` and, optionally,
-`GEMINI_API_KEY` as secrets in the Render service's Environment settings.
-The default NVIDIA model is `nvidia/nemotron-3.5-lightning-30b-a3b`; set
-`NVIDIA_MODEL` to another model enabled for your key if needed. Set
-`GEMINI_MODEL` to a model enabled for your Gemini key. Keys are used only by
-the backend and must never be placed in frontend code or committed files.
+The secure assistant uses NVIDIA NIM when `NVIDIA_API_KEY` is configured.
+Add the key as a secret in the Render service's Environment settings. The
+default NVIDIA model is `nvidia/nemotron-3.5-lightning-30b-a3b`; set
+`NVIDIA_MODEL` to another model enabled for your key if needed. The key is
+used only by the backend and must never be placed in frontend code or committed
+files.
 
 When a hosted model is enabled, the assistant sends the user's prompt and
 authorized retrieved document excerpts to that AI provider. Do not enable it

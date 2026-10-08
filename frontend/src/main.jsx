@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
-  Activity, Archive, ArrowUpRight, BadgeCheck, BarChart3, Bell, BookOpen,
+  Activity, Archive, ArrowLeft, ArrowUpRight, BadgeCheck, BarChart3, Bell, BookOpen,
   BrainCircuit, CheckCircle2, ChevronRight, FileLock2, FileText, Fingerprint,
   FolderKanban, Gauge, HardDriveUpload, KeyRound, LogOut, Menu, Orbit,
   Database, Container, TerminalSquare,
@@ -254,6 +254,7 @@ function App() {
   const [booting, setBooting] = useState(true);
   const [user, setUser] = useState(null);
   const [view, setView] = useState("overview");
+  const [featureReturnView, setFeatureReturnView] = useState(null);
   const [data, setData] = useState({ total_documents: 0, active_cases: 0, integrity: 100, activities: [], by_type: {} });
   const [documents, setDocuments] = useState([]);
   const [documentQuery, setDocumentQuery] = useState("");
@@ -474,7 +475,7 @@ function App() {
       <aside className={`${mobileNav ? "fixed inset-x-4 top-20 z-20 flex" : "hidden"} h-[calc(100dvh-6rem)] w-64 shrink-0 flex-col gap-4 lg:sticky lg:top-24 lg:flex lg:h-[calc(100dvh-7rem)] lg:self-start`}>
         <section aria-label="Workspace navigation" className="workspace-navigation-card min-h-0 flex-1 overflow-y-auto rounded-2xl border border-white/10 bg-panel p-3 shadow-2xl">
           <div className="mb-7 px-3 pt-3 text-[10px] font-bold uppercase tracking-[.22em] text-slate-500">Workspace</div>
-          <nav className="workspace-nav space-y-1">{nav.map(({id,label,icon: Icon}) => <button key={id} onClick={() => {if (id === "document-viewer") setSelectedDocument(null); setView(id); if (id === "settings") loadFeature("settings"); setMobileNav(false)}} className={`workspace-nav-item flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${view === id ? "bg-mint font-semibold text-ink shadow-lg shadow-mint/10" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}><Icon size={17}/>{label}{view === id && <ChevronRight size={15} className="ml-auto"/>}</button>)}</nav>
+          <nav className="workspace-nav space-y-1">{nav.map(({id,label,icon: Icon}) => <button key={id} onClick={() => {setFeatureReturnView(null); if (id === "document-viewer") setSelectedDocument(null); setView(id); if (id === "settings") loadFeature("settings"); setMobileNav(false)}} className={`workspace-nav-item flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${view === id ? "bg-mint font-semibold text-ink shadow-lg shadow-mint/10" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}><Icon size={17}/>{label}{view === id && <ChevronRight size={15} className="ml-auto"/>}</button>)}</nav>
         </section>
         <section aria-label="Evidence shield" className={`${mobileNav ? "hidden lg:block" : ""} shrink-0 rounded-2xl border border-mint/20 bg-mint/[.06] p-4`}><Sparkles size={18} className="mb-3 text-mint"/><div className="text-sm font-semibold">Evidence shield</div><p className="mt-1 text-xs leading-5 text-slate-400">Files are encrypted, signed and hash-verified before release.</p><div className="mt-4 flex items-center gap-2 text-xs text-mint"><CheckCircle2 size={14}/> Protected by design</div></section>
       </aside>
@@ -488,7 +489,7 @@ function App() {
         {view === "docker" && <SystemPage kind="docker" system={system}/>}
         {view === "scripts" && <SystemPage kind="scripts" system={system}/>}
         {view === "cases" && <CaseWorkspace notify={notify}/>}
-        {["collaboration", "public", "admin", "settings"].includes(view) && <FeatureHub kind={view} data={featureData[view]} load={() => loadFeature(view)} user={user} notify={notify} theme={theme} setTheme={setTheme} onNavigate={next => {setView(next); loadFeature(next);}}/>}
+        {["collaboration", "public", "admin", "settings"].includes(view) && <FeatureHub kind={view} data={featureData[view]} load={() => loadFeature(view)} user={user} notify={notify} theme={theme} setTheme={setTheme} returnToSettings={view === "collaboration" && featureReturnView === "settings"} onBack={() => {setView("settings"); setFeatureReturnView(null);}} onNavigate={next => {setFeatureReturnView(view === "settings" && next === "collaboration" ? "settings" : null); setView(next); loadFeature(next);}}/>}
       </main>
     </div>
     {showAuth && <Auth onDone={() => {setShowAuth(false);refresh()}} notify={notify} appVersion={appVersion}/>}
@@ -733,7 +734,7 @@ function CaseWorkspace({notify}) {
     </div></>;
 }
 
-function FeatureHub({kind, data, load, user, notify, theme, setTheme, onNavigate}) {
+function FeatureHub({kind, data, load, user, notify, theme, setTheme, returnToSettings, onBack, onNavigate}) {
   const [input, setInput] = useState("");
   const [result, setResult] = useState(null);
   const [mfaSetup, setMfaSetup] = useState(null);
@@ -879,7 +880,7 @@ function FeatureHub({kind, data, load, user, notify, theme, setTheme, onNavigate
       notify(`Unable to update notification: ${error.message}`);
     }
   };
-  return <><PageTitle eyebrow={config[0]} title={config[1]} subtitle={config[2]} action={kind === "settings" ? null : <div className="flex flex-col items-start gap-2 sm:items-end"><button onClick={refreshFeature} disabled={refreshing} className="rounded-xl border border-mint/25 px-4 py-2.5 text-sm font-semibold text-mint disabled:cursor-wait disabled:opacity-50">{refreshing ? "Refreshing..." : "Refresh"}</button>{refreshedAt && <span className="text-[10px] text-slate-500">Updated {refreshedAt.toLocaleTimeString()}</span>}{refreshFeedback && <span role="alert" className="text-[11px] text-amber-300">{refreshFeedback}</span>}</div>}/>
+  return <><PageTitle eyebrow={config[0]} title={config[1]} subtitle={config[2]} action={kind === "settings" ? null : <div className="flex flex-col items-start gap-2 sm:items-end">{returnToSettings && <button type="button" onClick={onBack} className="flex items-center gap-2 rounded-xl border border-electric/25 px-4 py-2.5 text-sm font-semibold text-electric transition hover:bg-electric/10"><ArrowLeft size={16}/>Back to Settings</button>}<button onClick={refreshFeature} disabled={refreshing} className="rounded-xl border border-mint/25 px-4 py-2.5 text-sm font-semibold text-mint disabled:cursor-wait disabled:opacity-50">{refreshing ? "Refreshing..." : "Refresh"}</button>{refreshedAt && <span className="text-[10px] text-slate-500">Updated {refreshedAt.toLocaleTimeString()}</span>}{refreshFeedback && <span role="alert" className="text-[11px] text-amber-300">{refreshFeedback}</span>}</div>}/>
     <div className="grid gap-5 lg:grid-cols-[1.25fr_.75fr]">
       <section className="rounded-2xl border border-white/10 bg-panel/70 p-6">
         <div className="mb-5 flex items-center gap-3"><div className="rounded-xl bg-mint/10 p-3 text-mint">{kind === "public" ? <Globe2 size={20}/> : kind === "admin" ? <ShieldAlert size={20}/> : <BriefcaseBusiness size={20}/>}</div><div><h2 className="font-bold">{config[1]}</h2><p className="text-xs text-slate-500">Workspace controls are connected to the secure API.</p></div></div>

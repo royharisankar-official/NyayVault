@@ -91,6 +91,104 @@ async function request(path, options = {}) {
   return removeDemoRecordLabel(data);
 }
 
+function renderAssistantInline(text) {
+  return text.split(/(\*\*[^*]+\*\*|__[^_]+__|`[^`]+`|\*[^*]+\*)/g).map((part, index) => {
+    if ((part.startsWith("**") && part.endsWith("**")) ||
+        (part.startsWith("__") && part.endsWith("__"))) {
+      return <strong key={index} className="font-semibold text-slate-100">{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith("`") && part.endsWith("`")) {
+      return <code key={index} className="rounded bg-black/10 px-1 py-0.5 font-mono text-[.92em]">{part.slice(1, -1)}</code>;
+    }
+    if (part.startsWith("*") && part.endsWith("*")) {
+      return <em key={index}>{part.slice(1, -1)}</em>;
+    }
+    return part;
+  });
+}
+
+function AssistantAnswer({content}) {
+  const prepared = String(content || "")
+    .replace(/\r\n?/g, "\n")
+    .replace(/[ \t]+(?=\d{1,2}[.)]\s+\*\*)/g, "\n")
+    .replace(/[ \t]+-\s+(?=\*\*[^*]+\*\*)/g, "\n- ")
+    .trim();
+  const lines = prepared.split("\n");
+  const blocks = [];
+  for (let index = 0; index < lines.length;) {
+    const line = lines[index].trim();
+    if (!line) {
+      index += 1;
+      continue;
+    }
+    const heading = line.match(/^#{1,4}\s+(.+)$/);
+    if (heading) {
+      blocks.push({type: "heading", text: heading[1]});
+      index += 1;
+      continue;
+    }
+    const ordered = line.match(/^\d{1,2}[.)]\s+(.+)$/);
+    if (ordered) {
+      const items = [];
+      while (index < lines.length) {
+        const item = lines[index].trim().match(/^\d{1,2}[.)]\s+(.+)$/);
+        if (!item) break;
+        const parts = item[1].split(/\s+-\s+(?=(?:\*\*)?[A-Z])/);
+        items.push({text: parts[0], details: parts.slice(1)});
+        index += 1;
+      }
+      blocks.push({type: "ordered", items});
+      continue;
+    }
+    if (/^[-*]\s+/.test(line)) {
+      const items = [];
+      while (index < lines.length && /^[-*]\s+/.test(lines[index].trim())) {
+        items.push(lines[index].trim().replace(/^[-*]\s+/, ""));
+        index += 1;
+      }
+      blocks.push({type: "unordered", items});
+      continue;
+    }
+    const paragraph = [line];
+    index += 1;
+    while (
+      index < lines.length &&
+      lines[index].trim() &&
+      !/^#{1,4}\s+/.test(lines[index].trim()) &&
+      !/^\d{1,2}[.)]\s+/.test(lines[index].trim()) &&
+      !/^[-*]\s+/.test(lines[index].trim())
+    ) {
+      paragraph.push(lines[index].trim());
+      index += 1;
+    }
+    blocks.push({type: "paragraph", text: paragraph.join(" ")});
+  }
+
+  return <div className="assistant-answer space-y-3 leading-7">
+    {blocks.map((block, index) => {
+      if (block.type === "heading") {
+        return <h4 key={index} className="pt-1 font-semibold text-slate-100">{renderAssistantInline(block.text)}</h4>;
+      }
+      if (block.type === "ordered") {
+        return <ol key={index} className="list-decimal space-y-3 pl-6 marker:font-semibold marker:text-electric">
+          {block.items.map((item, itemIndex) => <li key={itemIndex} className="pl-1">
+            <div>{renderAssistantInline(item.text)}</div>
+            {item.details.length > 0 && <ul className="mt-1 list-disc space-y-1 pl-5 marker:text-slate-500">
+              {item.details.map((detail, detailIndex) => <li key={detailIndex}>{renderAssistantInline(detail)}</li>)}
+            </ul>}
+          </li>)}
+        </ol>;
+      }
+      if (block.type === "unordered") {
+        return <ul key={index} className="list-disc space-y-1 pl-6 marker:text-electric">
+          {block.items.map((item, itemIndex) => <li key={itemIndex}>{renderAssistantInline(item)}</li>)}
+        </ul>;
+      }
+      return <p key={index}>{renderAssistantInline(block.text)}</p>;
+    })}
+  </div>;
+}
+
 function formatExactDateTime(value) {
   if (!value) return "now";
   if (value instanceof Date) {
@@ -1586,7 +1684,27 @@ function Intelligence({query, onSearch, onClearSearch, runSearch, results, searc
       <p className="mb-5 text-xs leading-5 text-slate-500">When hosted AI is enabled, your question and authorized document excerpts are processed by the configured provider. NVIDIA NIM is preferred when enabled. Verify important information against the original records and official sources.</p>
       <div className="mb-6 flex flex-wrap items-center gap-3 text-xs text-slate-400"><label className="flex items-center gap-2">Answer language<select aria-label="Secure answer language" value={language} onChange={event => setLanguage(event.target.value)} className="rounded-lg border border-white/10 bg-ink px-3 py-2 text-xs text-slate-200 outline-none"><option>English</option><option>Hindi</option><option>Bengali</option><option>Marathi</option><option>Tamil</option><option>Telugu</option><option>Kannada</option><option>Malayalam</option><option>Urdu</option></select></label><span className="text-slate-600">Uses authorized records when available.</span>{chatMessages.length > 0 && <button type="button" onClick={() => {setChatMessages([]); setAiError("");}} className="ml-auto text-electric hover:text-white">Clear conversation</button>}</div>
       {chatMessages.length === 0 && <div className="mb-5"><div className="mb-2 text-xs font-semibold text-slate-400">Try asking</div><div className="grid gap-2 sm:grid-cols-2">{guidedQuestions.map(prompt => <button key={prompt} type="button" onClick={() => setQuestion(prompt)} className="rounded-xl border border-white/10 px-3 py-2 text-left text-[11px] leading-5 text-slate-400 transition hover:border-electric/40 hover:text-electric">{prompt}</button>)}</div></div>}
-      {chatMessages.length > 0 && <div aria-live="polite" className="mb-6 max-h-[min(60vh,620px)] space-y-4 overflow-y-auto rounded-2xl border border-white/10 bg-ink/30 p-4 sm:p-6">{chatMessages.map((message, index) => <article key={`${index}-${message.role}`} className={`max-w-[95%] rounded-2xl p-4 text-sm ${message.role === "user" ? "ml-auto border border-electric/20 bg-electric/10 text-slate-100" : "border border-white/10 bg-panel/80 text-slate-200"}`}><div className="mb-2 flex items-center justify-between gap-3 text-[10px] uppercase tracking-wider text-slate-500"><span>{message.role === "user" ? "You" : "NyayVault AI"}</span>{message.provider && <span>{message.provider === "nvidia-nim" ? "NVIDIA AI" : message.provider}</span>}</div><p className="whitespace-pre-wrap leading-7">{message.content}</p>{message.generalGuidance && <p className="mt-3 text-xs text-amber-300">{message.provider === "general-guidance-fallback" ? "Hosted AI is not configured; this is built-in general guidance." : "General guidance only; no authorized case source was matched."}</p>}{message.disclaimer && <p className="mt-3 border-t border-white/10 pt-3 text-xs text-slate-500">{message.disclaimer}</p>}{message.sources?.length > 0 && <details className="mt-3 border-t border-white/10 pt-3 text-xs text-slate-400"><summary className="cursor-pointer">Supporting records ({message.sources.length})</summary><div className="mt-2 space-y-2">{message.sources.map(source => <div key={source.document_id}><div className="font-semibold text-slate-300">{source.title}</div><p className="mt-1 leading-5">{source.excerpt}</p></div>)}</div></details>}</article>)}{aiBusy && <div className="text-xs text-electric">NyayVault AI is thinking…</div>}</div>}
+      {chatMessages.length > 0 && <div aria-live="polite" className="mb-6 max-h-[min(60vh,620px)] space-y-4 overflow-y-auto rounded-2xl border border-white/10 bg-ink/30 p-4 sm:p-6">
+        {chatMessages.map((message, index) => <article key={`${index}-${message.role}`} className={`max-w-[95%] rounded-2xl p-4 text-sm ${message.role === "user" ? "ml-auto border border-electric/20 bg-electric/10 text-slate-100" : "border border-white/10 bg-panel/80 text-slate-200"}`}>
+          <div className="mb-2 flex items-center justify-between gap-3 text-[10px] uppercase tracking-wider text-slate-500">
+            <span>{message.role === "user" ? "You" : "NyayVault AI"}</span>
+            {message.provider && <span>{message.provider === "nvidia-nim" ? "NVIDIA AI" : message.provider}</span>}
+          </div>
+          {message.role === "assistant"
+            ? <AssistantAnswer content={message.content}/>
+            : <p className="whitespace-pre-wrap leading-7">{message.content}</p>}
+          {message.generalGuidance && <p className="mt-3 text-xs text-amber-300">{message.provider === "general-guidance-fallback" ? "Hosted AI is not configured; this is built-in general guidance." : "General guidance only; no authorized case source was matched."}</p>}
+          {message.disclaimer && <p className="mt-3 border-t border-white/10 pt-3 text-xs text-slate-500">{message.disclaimer}</p>}
+          {message.sources?.length > 0 && <details className="mt-3 border-t border-white/10 pt-3 text-xs text-slate-400">
+            <summary className="cursor-pointer">Supporting records ({message.sources.length})</summary>
+            <div className="mt-2 space-y-2">{message.sources.map(source => <div key={source.document_id}>
+              <div className="font-semibold text-slate-300">{source.title}</div>
+              <p className="mt-1 leading-5">{source.excerpt}</p>
+            </div>)}</div>
+          </details>}
+        </article>)}
+        {aiBusy && <div className="text-xs text-electric">NyayVault AI is thinking…</div>}
+      </div>}
       {aiError && <div role="alert" className="mb-5 rounded-xl border border-red-300/20 bg-red-300/5 p-4 text-sm text-red-200">{aiError}</div>}
       <form onSubmit={runAiTool} className="mb-4 flex flex-col gap-3 sm:flex-row"><div className="flex min-w-0 flex-1 items-center gap-3 rounded-xl border border-white/10 bg-ink/50 px-4 py-3"><textarea value={question} onChange={event => setQuestion(event.target.value)} onKeyDown={event => {if (event.key === "Enter" && !event.shiftKey) {event.preventDefault(); runAiTool(event);}}} maxLength={2000} rows={2} placeholder="Message NyayVault AI…" className="w-full resize-y bg-transparent outline-none placeholder:text-slate-600"/></div><button disabled={aiBusy || !question.trim()} className="rounded-xl bg-electric px-5 py-3 text-sm font-bold text-ink disabled:cursor-wait disabled:opacity-50">{aiBusy ? "Thinking…" : "Send"}</button></form>
       <section className="mt-8 rounded-2xl border border-white/10 bg-ink/30 p-4 sm:mt-10 sm:p-6">

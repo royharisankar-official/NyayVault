@@ -116,6 +116,54 @@ SEARCH_STOPWORDS = {
     "in", "into", "is", "of", "on", "or", "the", "to", "with",
 }
 
+
+def rank_document_keyword_matches(query: str, documents: list[Document]) -> list[dict]:
+    terms = [
+        term for term in re.findall(r"[a-z0-9]+", query.lower())
+        if len(term) > 2 and term not in SEARCH_STOPWORDS
+    ]
+    ranked = []
+    for document in documents:
+        searchable_fields = {
+            "title": document.title or "",
+            "filename": document.filename or "",
+            "document_type": document.document_type or "",
+            "description": document.description or "",
+            "tags": document.tags or "",
+            "extracted_text": document.extracted_text or "",
+        }
+        field_terms = {
+            field: set(re.findall(r"[a-z0-9]+", value.lower()))
+            for field, value in searchable_fields.items()
+        }
+        matched_terms = [
+            term for term in terms
+            if any(term in words for words in field_terms.values())
+        ]
+        if query and terms and not matched_terms:
+            continue
+        title_matches = sum(term in field_terms["title"] for term in matched_terms)
+        score = (
+            min(1.0, len(matched_terms) / len(terms) + (0.15 if title_matches else 0.0))
+            if terms else 1.0
+        )
+        text_value = " ".join(filter(None, searchable_fields.values()))
+        ranked.append({
+            "id": document.id,
+            "title": document.title,
+            "document_type": document.document_type,
+            "filename": document.filename,
+            "case_id": document.case_id,
+            "sensitivity": document.sensitivity or "confidential",
+            "uploader_id": document.uploader_id,
+            "text": text_value,
+            "score": score,
+            "matched_terms": matched_terms,
+        })
+    ranked.sort(key=lambda item: item["score"], reverse=True)
+    return ranked
+
+
 _audit_write_lock = threading.Lock()
 
 
@@ -1490,32 +1538,12 @@ def semantic_document_search(
             User.id.in_([item.uploader_id for item in documents])
         ).all()
     } if documents else {}
-    ranked = semantic_search(query or "legal investigation document", [{
-        "id": item.id,
-        "title": item.title,
-        "document_type": item.document_type,
-        "filename": item.filename,
-        "case_id": item.case_id,
-        "sensitivity": item.sensitivity or "confidential",
-        "uploader_id": item.uploader_id,
-        "text": " ".join(filter(None, [
-            item.title, item.filename, item.document_type, item.description,
-            item.tags, item.extracted_text,
-        ])),
-    } for item in documents])
-    terms = [
-        term for term in re.findall(r"[a-z0-9]+", query.lower())
-        if len(term) > 2 and term not in SEARCH_STOPWORDS
-    ]
+    ranked = rank_document_keyword_matches(query, documents)
     results = []
     for item in ranked[:max(1, min(limit, 50))]:
         text_value = item.get("text", "")
-        lower_text = text_value.lower()
-        text_terms = set(re.findall(r"[a-z0-9]+", lower_text))
-        matched_terms = [term for term in terms if term in text_terms]
-        if query and terms and not matched_terms:
-            continue
-        score = max(0.0, min(1.0, (float(item.get("score", 0)) + 1) / 2))
+        matched_terms = item["matched_terms"]
+        score = item["score"]
         if score < max(0.0, min(1.0, min_similarity)):
             continue
         results.append({

@@ -18,7 +18,9 @@ class Settings(BaseModel):
     GEMINI_API_KEY: str | None = os.getenv("GEMINI_API_KEY")
     GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
     NVIDIA_API_KEY: str | None = os.getenv("NVIDIA_API_KEY")
-    NVIDIA_MODEL: str = os.getenv("NVIDIA_MODEL", "nvidia/nemotron-3-super-120b-a12b")
+    NVIDIA_MODEL: str = os.getenv(
+        "NVIDIA_MODEL", "nvidia/nemotron-3.5-lightning-30b-a3b"
+    )
     BASE_DIR: Path = BASE_DIR
 
     # File storage

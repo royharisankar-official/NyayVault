@@ -6,6 +6,7 @@ instead of silently claiming that a feature ran.
 """
 
 import base64
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from functools import lru_cache
 import hashlib
 import hmac
@@ -24,6 +25,8 @@ import urllib.request
 from pathlib import Path
 
 from app.config import settings
+
+_AI_PROVIDER_POOL = ThreadPoolExecutor(max_workers=8, thread_name_prefix="ai-provider")
 
 try:
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -290,10 +293,12 @@ def gemini_generate(prompt: str) -> str:
     if not settings.GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY is not configured")
     payload = json.dumps({
-        "contents": [{"parts": [{"text": prompt[:30000]}]}]
+        "contents": [{"parts": [{"text": prompt[:30000]}]}],
+        "generationConfig": {"maxOutputTokens": 2048},
     }).encode()
     request = urllib.request.Request(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?"
+        f"https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{settings.GEMINI_MODEL}:generateContent?"
         + urllib.parse.urlencode({"key": settings.GEMINI_API_KEY}),
         data=payload,
         headers={"Content-Type": "application/json"},
@@ -308,9 +313,12 @@ def gemini_generate(prompt: str) -> str:
     except (urllib.error.URLError, TimeoutError) as error:
         raise RuntimeError(f"Gemini request failed: {error}") from error
     try:
-        return result["candidates"][0]["content"]["parts"][0]["text"].strip()
+        generated = result["candidates"][0]["content"]["parts"][0]["text"].strip()
     except (KeyError, IndexError, TypeError) as error:
         raise RuntimeError("Gemini returned an unexpected response") from error
+    if not generated:
+        raise RuntimeError("Gemini returned an empty response")
+    return generated
 
 
 def nvidia_generate(prompt: str, system_prompt: str) -> str:
@@ -362,13 +370,43 @@ def nvidia_generate(prompt: str, system_prompt: str) -> str:
 
 
 def generate_ai_text(prompt: str, system_prompt: str) -> tuple[str, str]:
-    """Use NVIDIA when configured, otherwise use the configured Gemini API."""
+    """Return the first successful answer from configured hosted AI providers."""
+    providers = []
     if settings.NVIDIA_API_KEY:
-        return nvidia_generate(prompt, system_prompt), "nvidia-nim"
+        providers.append(
+            ("nvidia-nim", lambda: nvidia_generate(prompt, system_prompt))
+        )
     if settings.GEMINI_API_KEY:
-        return gemini_generate(f"{system_prompt}\n\n{prompt}"), "gemini"
+        providers.append(
+            ("gemini", lambda: gemini_generate(f"{system_prompt}\n\n{prompt}"))
+        )
+    if not providers:
+        raise RuntimeError(
+            "No hosted AI provider is configured. Add NVIDIA_API_KEY to the server environment."
+        )
+    if len(providers) == 1:
+        provider, generate = providers[0]
+        return generate(), provider
+
+    pending = {
+        _AI_PROVIDER_POOL.submit(generate): provider
+        for provider, generate in providers
+    }
+    failures = []
+    while pending:
+        completed, _ = wait(pending, return_when=FIRST_COMPLETED)
+        for future in completed:
+            provider = pending.pop(future)
+            try:
+                answer = future.result()
+            except Exception as error:
+                failures.append(f"{provider}: {error}")
+                continue
+            for slower_request in pending:
+                slower_request.cancel()
+            return answer, provider
     raise RuntimeError(
-        "No hosted AI provider is configured. Add NVIDIA_API_KEY to the server environment."
+        "All configured AI providers failed: " + "; ".join(failures)
     )
 
 

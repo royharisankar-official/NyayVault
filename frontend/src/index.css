@@ -178,6 +178,7 @@ html:has(.auth-shell), body:has(.auth-shell) { overflow: hidden !important; }
 .light .boot-pulse { color: rgba(88,106,130,.8); }
 .light body { color: #17243a; background: radial-gradient(circle at 82% -12%, #c8eee7 0, #eef4f7 42%, #e7eef3 100%); }
 .light .bg-ink { background-color: #eef4f7; }
+.light .bg-ink\/30 { background-color: rgba(255,255,255,.72); }
 .light .bg-ink\/50,
 .light .bg-ink\/40 { background-color: rgba(255,255,255,.82); }
 .light .bg-panel,

@@ -2153,14 +2153,16 @@ def add_collaborator(case_id: int, request: CollaboratorRequest,
                      db: Session = Depends(get_db),
                      user: User = Depends(require_roles("admin", "police", "investigator", "court_officer"))):
     require_privileged_mfa(user)
-    if not db.get(Case, case_id):
+    case = db.get(Case, case_id)
+    if not case:
         raise HTTPException(status_code=404, detail="Case not found")
     if user.role != "admin" and not db.query(CaseCollaborator).filter(
         CaseCollaborator.case_id == case_id,
         CaseCollaborator.user_id == user.id,
     ).first():
         raise HTTPException(status_code=403, detail="Case access is not authorized")
-    if not db.get(User, request.user_id):
+    member = db.get(User, request.user_id)
+    if not member or not member.is_active:
         raise HTTPException(status_code=404, detail="Authorized user not found")
     if not request.department.strip():
         raise HTTPException(status_code=400, detail="Department is required")
@@ -2171,8 +2173,26 @@ def add_collaborator(case_id: int, request: CollaboratorRequest,
         CaseCollaborator.user_id == request.user_id,
     ).first()
     if existing:
+        access_changed = (
+            existing.department != request.department.strip()
+            or existing.access_level != request.access_level
+        )
         existing.department = request.department.strip()
         existing.access_level = request.access_level
+        if access_changed:
+            db.add(Notification(
+                user_id=member.id,
+                title="Case team access updated",
+                message=(
+                    f"Your access to {case.case_number} — {case.title} was updated by "
+                    f"{user.full_name}. Department: {existing.department}. "
+                    f"Access level: {existing.access_level}."
+                ),
+                status="pending",
+            ))
+            write_audit(db, "case.collaborator_access_updated", "case", user.id, case_id,
+                        {"user_id": member.id, "department": existing.department,
+                         "access_level": existing.access_level})
         db.commit()
         return {"id": existing.id, "case_id": case_id, "user_id": request.user_id,
                 "department": existing.department, "access_level": existing.access_level}
@@ -2181,6 +2201,16 @@ def add_collaborator(case_id: int, request: CollaboratorRequest,
         department=request.department.strip(), access_level=request.access_level,
     )
     db.add(collaborator)
+    db.add(Notification(
+        user_id=member.id,
+        title="Added to case team",
+        message=(
+            f"{user.full_name} added you to the case team for "
+            f"{case.case_number} — {case.title}. Department: "
+            f"{collaborator.department}. Access level: {collaborator.access_level}."
+        ),
+        status="pending",
+    ))
     write_audit(db, "case.collaborator_added", "case", user.id, case_id,
                 {"user_id": request.user_id, "department": collaborator.department})
     db.commit()

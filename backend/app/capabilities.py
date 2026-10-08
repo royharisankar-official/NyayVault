@@ -321,12 +321,15 @@ def nvidia_generate(
     )
     try:
         with urllib.request.urlopen(request, timeout=90) as response:
-            result = json.loads(response.read().decode())
+            response_body = response.read().decode("utf-8")
+            result = json.loads(response_body)
     except urllib.error.HTTPError as error:
         detail = error.read().decode("utf-8", errors="replace")[:500]
         raise RuntimeError(f"NVIDIA AI request failed ({error.code}): {detail}") from error
     except (urllib.error.URLError, TimeoutError) as error:
         raise RuntimeError(f"NVIDIA AI request failed: {error}") from error
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise RuntimeError("NVIDIA AI returned an invalid JSON response") from error
     try:
         content = result["choices"][0]["message"]["content"]
         if isinstance(content, list):

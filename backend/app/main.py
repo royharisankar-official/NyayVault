@@ -117,7 +117,11 @@ SEARCH_STOPWORDS = {
 }
 
 
-def rank_document_keyword_matches(query: str, documents: list[Document]) -> list[dict]:
+def rank_document_keyword_matches(
+    query: str,
+    documents: list[Document],
+    text_limit: int = 220,
+) -> list[dict]:
     terms = [
         term for term in re.findall(r"[a-z0-9]+", query.lower())
         if len(term) > 2 and term not in SEARCH_STOPWORDS
@@ -162,10 +166,10 @@ def rank_document_keyword_matches(query: str, documents: list[Document]) -> list
         snippet_parts = []
         snippet_length = 0
         for value in searchable_fields.values():
-            if not value or snippet_length >= 220:
+            if not value or snippet_length >= text_limit:
                 continue
             separator = " " if snippet_parts else ""
-            available = 220 - snippet_length - len(separator)
+            available = text_limit - snippet_length - len(separator)
             if available <= 0:
                 break
             snippet_parts.append(separator + value[:available])
@@ -1637,14 +1641,14 @@ def rag_legal_qa(request: AiQuestionRequest, db: Session = Depends(get_db),
         "good morning", "good afternoon", "good evening", "how are you",
     }
     if is_social_greeting:
-        documents = []
         ranked = []
     else:
         ensure_demo_workspace_records(db, user)
         documents = authorized_documents(db, user, request.document_ids)
-        contexts = document_context(documents)
         ranked = [
-            item for item in semantic_search(request.question, contexts)
+            item for item in rank_document_keyword_matches(
+                request.question, documents, text_limit=1200
+            )
             if float(item.get("score", 0)) >= 0.15
         ][:3]
     sources = [{

@@ -59,7 +59,19 @@ async function request(path, options = {}) {
   } catch (error) {
     throw new Error(`Unable to reach the ${PRODUCT_NAME} API. Start the backend on port 8000 and try again. (${error.message})`);
   }
-  const data = await response.json().catch(() => ({}));
+  const responseText = await response.text();
+  let data = {};
+  if (responseText) {
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      data = {
+        detail: response.status === 502
+          ? "The server or AI provider returned HTTP 502. It may be temporarily busy or timed out; please try again."
+          : `The server returned an unreadable response (HTTP ${response.status}).`,
+      };
+    }
+  }
   if (!response.ok) {
     const detail = data?.detail;
     const message = typeof detail === "string"

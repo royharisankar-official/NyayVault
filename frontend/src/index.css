@@ -185,6 +185,8 @@ html:has(.auth-shell), body:has(.auth-shell) { overflow: hidden !important; }
 .light .bg-panel\/60,
 .light .bg-panel\/70,
 .light .bg-panel\/75 { background-color: rgba(255,255,255,.9); box-shadow: 0 16px 40px rgba(40,67,92,.08); }
+.light .bg-panel\/80 { background-color: rgba(255,255,255,.9); box-shadow: 0 8px 24px rgba(40,67,92,.06); }
+.bg-panel\/80 > div:first-child > span:nth-child(2) { display: none; }
 .light .bg-white\/\[\.04\] { background-color: rgba(35,73,97,.055); }
 .light .bg-white\/\[\.03\] { background-color: rgba(35,73,97,.045); }
 .light .bg-white\/\[\.02\] { background-color: rgba(35,73,97,.032); }

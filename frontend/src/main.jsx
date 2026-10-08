@@ -195,6 +195,9 @@ function App() {
     return () => { active = false; };
   }, []);
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [view]);
+  useEffect(() => {
     document.documentElement.classList.toggle("light", theme === "light");
     localStorage.setItem("dms_theme", theme);
   }, [theme]);

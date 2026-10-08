@@ -21,6 +21,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
+          fetch-depth: 0
 
       - name: Select application version
         id: version
@@ -36,7 +37,24 @@ jobs:
           major="${BASH_REMATCH[1]}"
           minor="${BASH_REMATCH[2]}"
           patch="${BASH_REMATCH[3]}"
-          if git diff --quiet "$BEFORE_SHA" HEAD -- VERSION; then
+          version_unchanged=true
+          if [[ ! "$BEFORE_SHA" =~ ^0+$ ]]; then
+            if ! git cat-file -e "${BEFORE_SHA}^{commit}"; then
+              echo "Unable to find the commit preceding this push: $BEFORE_SHA" >&2
+              exit 1
+            fi
+            if git diff --quiet "$BEFORE_SHA" "$GITHUB_SHA" -- VERSION; then
+              version_unchanged=true
+            else
+              diff_status=$?
+              if [[ "$diff_status" -ne 1 ]]; then
+                echo "Unable to determine whether VERSION changed in this push." >&2
+                exit "$diff_status"
+              fi
+              version_unchanged=false
+            fi
+          fi
+          if [[ "$version_unchanged" == true ]]; then
             next="$major.$minor.$((patch + 1))"
             printf '%s\n' "$next" > VERSION
             echo "changed=true" >> "$GITHUB_OUTPUT"

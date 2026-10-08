@@ -2125,7 +2125,7 @@ def download_shared_document(share_token: str, db: Session = Depends(get_db)):
 def collaborator_candidates(
     case_id: int,
     db: Session = Depends(get_db),
-    user: User = Depends(require_roles("admin", "police", "investigator")),
+    user: User = Depends(require_roles("admin", "police", "investigator", "court_officer")),
 ):
     if not db.get(Case, case_id):
         raise HTTPException(status_code=404, detail="Case not found")
@@ -2151,10 +2151,15 @@ def collaborator_candidates(
 @app.post("/api/cases/{case_id}/collaborators")
 def add_collaborator(case_id: int, request: CollaboratorRequest,
                      db: Session = Depends(get_db),
-                     user: User = Depends(require_roles("admin", "police", "investigator"))):
+                     user: User = Depends(require_roles("admin", "police", "investigator", "court_officer"))):
     require_privileged_mfa(user)
     if not db.get(Case, case_id):
         raise HTTPException(status_code=404, detail="Case not found")
+    if user.role != "admin" and not db.query(CaseCollaborator).filter(
+        CaseCollaborator.case_id == case_id,
+        CaseCollaborator.user_id == user.id,
+    ).first():
+        raise HTTPException(status_code=403, detail="Case access is not authorized")
     if not db.get(User, request.user_id):
         raise HTTPException(status_code=404, detail="Authorized user not found")
     if not request.department.strip():

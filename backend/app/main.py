@@ -29,7 +29,7 @@ from app.capabilities import (
 )
 from app.models import (
     AIQuery, AuditLog, BackupRecord, BlockchainRecord, Case, CaseCollaborator,
-    CaseEvent, ChainAnchor, Document, DocumentShare, DocumentVersion,
+    CaseEvent, ChainAnchor, Document, DocumentContent, DocumentShare, DocumentVersion,
     Notification, PasswordResetToken, Permission, User,
 )
 from app.public_portal import (
@@ -178,6 +178,31 @@ def backup_directory() -> Path:
     destination = persistent_data_dir() / "backups"
     destination.mkdir(parents=True, exist_ok=True)
     return destination
+
+
+def read_encrypted_document_content(
+    db: Session,
+    document_id: int,
+    version_number: int,
+    file_path: str | None,
+) -> bytes:
+    stored_content = db.query(DocumentContent).filter(
+        DocumentContent.document_id == document_id,
+        DocumentContent.version == version_number,
+    ).first()
+    if stored_content:
+        return bytes(stored_content.encrypted_content)
+    if file_path:
+        path = Path(file_path)
+        if path.is_file():
+            return path.read_bytes()
+    raise HTTPException(
+        status_code=404,
+        detail=(
+            "Document file is unavailable. It may have been lost before durable "
+            "storage was enabled; re-upload the original document to restore it."
+        ),
+    )
 
 
 def sqlite_database_path() -> Path | None:
@@ -1039,6 +1064,11 @@ async def upload_document(
     item.encrypted = True
     db.add(item)
     db.flush()
+    db.add(DocumentContent(
+        document_id=item.id,
+        version=1,
+        encrypted_content=stored_content,
+    ))
     db.add(DocumentVersion(
         document_id=item.id, version=1, file_path=str(destination),
         sha256=digest, created_by=user.id, notes="Initial upload",
@@ -1065,9 +1095,11 @@ async def upload_document(
 @app.get("/api/documents/{document_id}/download")
 def download_document(document_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
     item = db.get(Document, document_id)
-    if not item or not item.is_active or not can_access_document(db, item, user) or not Path(item.file_path).is_file():
+    if not item or not item.is_active or not can_access_document(db, item, user):
         raise HTTPException(status_code=404, detail="Document not found")
-    content = decrypt_bytes(Path(item.file_path).read_bytes())
+    content = decrypt_bytes(read_encrypted_document_content(
+        db, item.id, item.version or 1, item.file_path
+    ))
     calculated_hash = hashlib.sha256(content).hexdigest()
     if calculated_hash != item.sha256:
         write_audit(db, "document.verification_failed", "document", user.id, item.id,
@@ -1094,9 +1126,9 @@ def verify_document(document_id: int, db: Session = Depends(get_db),
     item = db.get(Document, document_id)
     if not item or not item.is_active or not can_access_document(db, item, user):
         raise HTTPException(status_code=404, detail="Document not found")
-    if not Path(item.file_path).is_file():
-        raise HTTPException(status_code=404, detail="Document content not found")
-    content = decrypt_bytes(Path(item.file_path).read_bytes())
+    content = decrypt_bytes(read_encrypted_document_content(
+        db, item.id, item.version or 1, item.file_path
+    ))
     calculated_hash = hashlib.sha256(content).hexdigest()
     hash_valid = calculated_hash == item.sha256
     signature_valid = bool(item.signature) and verify_signature(
@@ -1151,9 +1183,9 @@ def anchor_document(document_id: int, db: Session = Depends(get_db),
     item = db.get(Document, document_id)
     if not item or not item.is_active or not can_access_document(db, item, user):
         raise HTTPException(status_code=404, detail="Document not found")
-    if not Path(item.file_path).is_file():
-        raise HTTPException(status_code=404, detail="Document content not found")
-    content = decrypt_bytes(Path(item.file_path).read_bytes())
+    content = decrypt_bytes(read_encrypted_document_content(
+        db, item.id, item.version or 1, item.file_path
+    ))
     calculated_hash = hashlib.sha256(content).hexdigest()
     if calculated_hash != item.sha256:
         raise HTTPException(status_code=409, detail="Integrity check failed")
@@ -1917,6 +1949,11 @@ def document_versions(document_id: int, db: Session = Depends(get_db),
     versions = db.query(DocumentVersion).filter(
         DocumentVersion.document_id == document_id
     ).order_by(desc(DocumentVersion.version)).all()
+    stored_versions = {
+        content.version for content in db.query(DocumentContent.version).filter(
+            DocumentContent.document_id == document_id
+        ).all()
+    }
     write_audit(db, "document.versions_viewed", "document", user.id, document_id,
                 {"version_count": len(versions)})
     db.commit()
@@ -1926,7 +1963,10 @@ def document_versions(document_id: int, db: Session = Depends(get_db),
         "notes": version.notes, "created_by": version.created_by,
         "created_at": version.created_at.isoformat() if version.created_at else None,
         "is_current": version.version == (item.version or 1),
-        "downloadable": Path(version.file_path).is_file(),
+        "downloadable": (
+            (bool(version.file_path) and Path(version.file_path).is_file())
+            or version.version in stored_versions
+        ),
     } for version in versions]
 
 
@@ -1941,10 +1981,9 @@ def download_document_version(document_id: int, version_number: int,
     ).first()
     if not item or not item.is_active or not version or not can_access_document(db, item, user):
         raise HTTPException(status_code=404, detail="Document version not found")
-    path = Path(version.file_path)
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail="Document version file is unavailable")
-    content = decrypt_bytes(path.read_bytes())
+    content = decrypt_bytes(read_encrypted_document_content(
+        db, item.id, version.version, version.file_path
+    ))
     if hashlib.sha256(content).hexdigest() != version.sha256:
         raise HTTPException(status_code=409, detail="Version integrity check failed")
     write_audit(db, "document.version_downloaded", "document", user.id, item.id,
@@ -1973,11 +2012,17 @@ async def create_document_version(
     digest = hashlib.sha256(content).hexdigest()
     version_number = (item.version or 1) + 1
     destination = settings.UPLOAD_DIR / f"{secrets.token_hex(12)}.version"
-    destination.write_bytes(encrypt_bytes(content))
+    encrypted_content = encrypt_bytes(content)
+    destination.write_bytes(encrypted_content)
     version = DocumentVersion(
         document_id=item.id, version=version_number, file_path=str(destination),
         sha256=digest, created_by=user.id, notes=notes.strip(),
     )
+    db.add(DocumentContent(
+        document_id=item.id,
+        version=version_number,
+        encrypted_content=encrypted_content,
+    ))
     item.version = version_number
     item.file_path = str(destination)
     item.sha256 = digest
@@ -2017,11 +2062,13 @@ def share_document(document_id: int, request: ShareRequest,
 def download_shared_document(share_token: str, db: Session = Depends(get_db)):
     share = db.query(DocumentShare).filter(DocumentShare.share_token == share_token).first()
     item = db.get(Document, share.document_id) if share else None
-    if not share or not item or not item.is_active or not Path(item.file_path).is_file():
+    if not share or not item or not item.is_active:
         raise HTTPException(status_code=404, detail="Share link not found")
     if share.permission != "download":
         raise HTTPException(status_code=403, detail="This share only permits document preview")
-    content = decrypt_bytes(Path(item.file_path).read_bytes())
+    content = decrypt_bytes(read_encrypted_document_content(
+        db, item.id, item.version or 1, item.file_path
+    ))
     if hashlib.sha256(content).hexdigest() != item.sha256:
         raise HTTPException(status_code=409, detail="Integrity check failed")
     if not item.signature or not verify_signature(item.sha256, item.signature):

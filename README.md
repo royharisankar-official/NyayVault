@@ -120,9 +120,12 @@ Environment settings to point to a durable external PostgreSQL database. The
 application accepts standard `postgresql://` connection URLs. The SQLite
 fallback is intended for local development and is not durable on an ephemeral
 service filesystem. A Free web service can also spin down while idle, so its
-first request after inactivity may take time to start. Uploaded files still
-need persistent-disk or object-storage configuration; PostgreSQL only
-preserves database records.
+first request after inactivity may take time to start. Uploaded file contents
+are encrypted and stored with their document versions in the configured
+database, so they survive web-service restarts and deployments. Use a durable
+PostgreSQL database and its backup facilities for hosted deployments. Files
+uploaded before this storage change that are already missing from the service
+filesystem cannot be recovered and must be uploaded again.
 
 The production Docker image installs Tesseract OCR and the optional Python
 OCR and sentence-transformer dependencies. The embedding model is downloaded

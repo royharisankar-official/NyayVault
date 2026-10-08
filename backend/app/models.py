@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, LargeBinary, Text, UniqueConstraint
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -105,6 +105,17 @@ class DocumentVersion(Base):
     created_by = Column(Integer, nullable=False)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now(), index=True)
+
+
+class DocumentContent(Base):
+    __tablename__ = "document_contents"
+    __table_args__ = (UniqueConstraint("document_id", "version"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    document_id = Column(Integer, ForeignKey("documents.id"), nullable=False, index=True)
+    version = Column(Integer, nullable=False)
+    encrypted_content = Column(LargeBinary, nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
 
 
 class DocumentShare(Base):

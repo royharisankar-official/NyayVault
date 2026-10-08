@@ -187,6 +187,7 @@ def ai_summary(text: str) -> tuple[str, str]:
             "documented facts, uncertainty, and suggested follow-up. This is not "
             "legal advice."
         ),
+        max_tokens=1536,
     )
 
 
@@ -284,7 +285,12 @@ def local_document_analysis(text: str) -> dict:
     }
 
 
-def nvidia_generate(prompt: str, system_prompt: str) -> str:
+def nvidia_generate(
+    prompt: str,
+    system_prompt: str,
+    max_tokens: int = 768,
+    reasoning_budget: int = 256,
+) -> str:
     """Generate text using NVIDIA's OpenAI-compatible hosted inference API."""
     if not settings.NVIDIA_API_KEY:
         raise RuntimeError("NVIDIA_API_KEY is not configured")
@@ -296,7 +302,12 @@ def nvidia_generate(prompt: str, system_prompt: str) -> str:
         ],
         "temperature": 1.0,
         "top_p": 0.95,
-        "max_tokens": 2048,
+        "max_tokens": max_tokens,
+        "chat_template_kwargs": {
+            "enable_thinking": True,
+            "low_effort": True,
+        },
+        "reasoning_budget": reasoning_budget,
         "stream": False,
     }).encode()
     request = urllib.request.Request(
@@ -332,10 +343,16 @@ def nvidia_generate(prompt: str, system_prompt: str) -> str:
         raise RuntimeError("NVIDIA AI returned an unexpected response") from error
 
 
-def generate_ai_text(prompt: str, system_prompt: str) -> tuple[str, str]:
+def generate_ai_text(
+    prompt: str,
+    system_prompt: str,
+    max_tokens: int = 768,
+) -> tuple[str, str]:
     """Generate text with the configured NVIDIA NIM provider."""
     if settings.NVIDIA_API_KEY:
-        return nvidia_generate(prompt, system_prompt), "nvidia-nim"
+        return nvidia_generate(
+            prompt, system_prompt, max_tokens=max_tokens
+        ), "nvidia-nim"
     raise RuntimeError(
         "No hosted AI provider is configured. Add NVIDIA_API_KEY to the server environment."
     )

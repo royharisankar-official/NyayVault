@@ -106,6 +106,10 @@ default NVIDIA model is `nvidia/nemotron-3-super-120b-a12b`; set
 `NVIDIA_MODEL` to another model enabled for your key if needed. The key is
 used only by the backend and must never be placed in frontend code or committed
 files.
+Chat requests use NVIDIA Nemotron's documented low-effort reasoning mode,
+cap reasoning at 256 tokens, and limit answers to 768 generated tokens to
+reduce wait time. Chat retrieval and conversation history are also bounded.
+Detailed AI document summaries retain a larger 1,536-token answer limit.
 
 When a hosted model is enabled, the assistant sends the user's prompt and
 authorized retrieved document excerpts to that AI provider. Do not enable it

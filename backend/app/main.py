@@ -122,6 +122,10 @@ def rank_document_keyword_matches(query: str, documents: list[Document]) -> list
         term for term in re.findall(r"[a-z0-9]+", query.lower())
         if len(term) > 2 and term not in SEARCH_STOPWORDS
     ]
+    term_patterns = {
+        term: re.compile(rf"(?<![a-z0-9]){re.escape(term)}(?![a-z0-9])", re.IGNORECASE)
+        for term in terms
+    }
     ranked = []
     for document in documents:
         searchable_fields = {
@@ -132,22 +136,41 @@ def rank_document_keyword_matches(query: str, documents: list[Document]) -> list
             "tags": document.tags or "",
             "extracted_text": document.extracted_text or "",
         }
-        field_terms = {
-            field: set(re.findall(r"[a-z0-9]+", value.lower()))
-            for field, value in searchable_fields.items()
-        }
         matched_terms = [
             term for term in terms
-            if any(term in words for words in field_terms.values())
+            if any(
+                term_patterns[term].search(value)
+                for value in searchable_fields.values()
+            )
         ]
         if query and terms and not matched_terms:
             continue
-        title_matches = sum(term in field_terms["title"] for term in matched_terms)
+        title_matches = sum(
+            term_patterns[term].search(searchable_fields["title"]) is not None
+            for term in matched_terms
+        )
         score = (
             min(1.0, len(matched_terms) / len(terms) + (0.15 if title_matches else 0.0))
             if terms else 1.0
         )
-        text_value = " ".join(filter(None, searchable_fields.values()))
+        non_empty_fields = [
+            value for value in searchable_fields.values() if value
+        ]
+        full_text_length = sum(map(len, non_empty_fields)) + max(
+            len(non_empty_fields) - 1, 0
+        )
+        snippet_parts = []
+        snippet_length = 0
+        for value in searchable_fields.values():
+            if not value or snippet_length >= 220:
+                continue
+            separator = " " if snippet_parts else ""
+            available = 220 - snippet_length - len(separator)
+            if available <= 0:
+                break
+            snippet_parts.append(separator + value[:available])
+            snippet_length += len(separator) + min(len(value), available)
+        text_value = "".join(snippet_parts)
         ranked.append({
             "id": document.id,
             "title": document.title,
@@ -159,6 +182,7 @@ def rank_document_keyword_matches(query: str, documents: list[Document]) -> list
             "text": text_value,
             "score": score,
             "matched_terms": matched_terms,
+            "text_truncated": full_text_length > 220,
         })
     ranked.sort(key=lambda item: item["score"], reverse=True)
     return ranked
@@ -1590,7 +1614,7 @@ def semantic_document_search(
             "department": uploader_departments.get(item.get("uploader_id")),
             "score": score,
             "matched_terms": matched_terms,
-            "snippet": text_value[:220] + ("…" if len(text_value) > 220 else ""),
+            "snippet": text_value[:220] + ("…" if item["text_truncated"] else ""),
         })
     write_audit(db, "document.semantic_search", "document", user.id, None,
                 {"query": query, "document_type": document_type, "case_id": case_id,
@@ -1605,13 +1629,24 @@ def semantic_document_search(
 @app.post("/api/ai/rag-qa")
 def rag_legal_qa(request: AiQuestionRequest, db: Session = Depends(get_db),
                  user: User = Depends(current_user)):
-    ensure_demo_workspace_records(db, user)
-    documents = authorized_documents(db, user, request.document_ids)
-    contexts = document_context(documents)
-    ranked = [
-        item for item in semantic_search(request.question, contexts)
-        if float(item.get("score", 0)) >= 0.15
-    ][:5]
+    normalized_question = re.sub(
+        r"[\s!?.,]+$", "", request.question.lower()
+    ).strip()
+    is_social_greeting = normalized_question in {
+        "hi", "hello", "hey", "hi there", "hello there", "hey there",
+        "good morning", "good afternoon", "good evening", "how are you",
+    }
+    if is_social_greeting:
+        documents = []
+        ranked = []
+    else:
+        ensure_demo_workspace_records(db, user)
+        documents = authorized_documents(db, user, request.document_ids)
+        contexts = document_context(documents)
+        ranked = [
+            item for item in semantic_search(request.question, contexts)
+            if float(item.get("score", 0)) >= 0.15
+        ][:5]
     sources = [{
         "document_id": item["id"], "title": item["title"],
         "document_type": item["document_type"],

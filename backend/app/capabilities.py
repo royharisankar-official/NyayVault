@@ -356,6 +356,7 @@ def capabilities() -> dict:
         "permissioned_chain_anchor": True,
         "nvidia_api": bool(settings.NVIDIA_API_KEY),
         "ai_provider": "nvidia-nim" if settings.NVIDIA_API_KEY else "not-configured",
+        "nvidia_model": settings.NVIDIA_MODEL if settings.NVIDIA_API_KEY else None,
     }
 
 
